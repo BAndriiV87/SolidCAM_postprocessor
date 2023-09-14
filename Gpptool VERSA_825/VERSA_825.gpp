@@ -1,0 +1,5 @@
+
+; Постпроцессор SolidCAM 2016
+ 
+Inc "INSERT_GPP"
+

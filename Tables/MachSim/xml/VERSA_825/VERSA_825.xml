@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<machine_definition>
+    <machine_data name="VERSA_825" version="1.8" units="metric" controller="">
+        <view_transform initialvalue="1.00000000,0.00000000,0.00000000,0.00000000,0.00000000,1.00000000,0.00000000,0.00000000,0.00000000,0.00000000,1.00000000,0.00000000,0.00000000,0.00000000,0.00000000,1.00000000" />
+    </machine_data>
+    <transform id="machine_transform" initialvalue="0.00000000,-1.00000000,0.00000000,0.00000000,1.00000000,0.00000000,0.00000000,0.00000000,0.00000000,0.00000000,1.00000000,0.00000000,0.00000000,0.00000000,0.00000000,1.00000000">
+        <geometry name="Stanina" geo="versa_825 - stanina-1.stl" clrr="0.50196081" clrg="0.50196081" clrb="0.50196081" alpha="0.00" reflectivity="0.00" reflectivityBitmapFileName="" objtype="geometry" />
+        <axis id="X" type="translation" x="-1.00000000" y="0.00000000" z="0.00000000" minvalue="0.000000" maxvalue="835.000000" valuetype="cont" initial_value="0.000000">
+            <axis id="A" type="rotation" x="-1.00000000" y="0.00000000" z="0.00000000" minvalue="-115.000000" maxvalue="115.000000" valuetype="cont" initial_value="0.000000" rzx="0.00000000" rzy="585.00000000" rzz="-520.00000000">
+                <axis id="C" type="rotation" x="0.00000000" y="0.00000000" z="-1.00000000" minvalue="-10000000.000000" maxvalue="10000000.000000" valuetype="cont" initial_value="0.000000" rzx="240.00000000" rzy="585.00000000" rzz="0.00000000">
+                    <geometry name="Rotatcionnyi_stol" geo="versa_825 - rotatcionnyi_stol-2.stl" clrr="0.87843138" clrg="0.87843138" clrb="0.87843138" alpha="0.00" reflectivity="0.00" reflectivityBitmapFileName="tablereflection.bmp" objtype="geometry" />
+                    <transform id="workpiece_transform" initialvalue="1.00000000,0.00000000,0.00000000,240.00000000,0.00000000,1.00000000,0.00000000,585.00000000,0.00000000,0.00000000,1.00000000,-570.00000000,0.00000000,0.00000000,0.00000000,1.00000000">
+                        <geometry name="fixture0" geo="" clrr="1.00000000" clrg="0.50196081" clrb="0.00000000" alpha="0.00" reflectivity="0.00" reflectivityBitmapFileName="tablereflection.bmp" objtype="fixture" />
+                        <geometry name="fixture1" geo="" clrr="1.00000000" clrg="0.50196081" clrb="0.00000000" alpha="0.00" reflectivity="0.00" reflectivityBitmapFileName="tablereflection.bmp" objtype="fixture" />
+                        <geometry name="fixture2" geo="" clrr="1.00000000" clrg="0.50196081" clrb="0.00000000" alpha="0.00" reflectivity="0.00" reflectivityBitmapFileName="tablereflection.bmp" objtype="fixture" />
+                        <geometry name="fixture3" geo="" clrr="1.00000000" clrg="0.50196081" clrb="0.00000000" alpha="0.00" reflectivity="0.00" reflectivityBitmapFileName="tablereflection.bmp" objtype="fixture" />
+                        <geometry name="fixture4" geo="" clrr="1.00000000" clrg="0.50196081" clrb="0.00000000" alpha="0.00" reflectivity="0.00" reflectivityBitmapFileName="tablereflection.bmp" objtype="fixture" />
+                        <geometry name="fixture5" geo="" clrr="1.00000000" clrg="0.50196081" clrb="0.00000000" alpha="0.00" reflectivity="0.00" reflectivityBitmapFileName="tablereflection.bmp" objtype="fixture" />
+                        <geometry name="fixture6" geo="" clrr="1.00000000" clrg="0.50196081" clrb="0.00000000" alpha="0.00" reflectivity="0.00" reflectivityBitmapFileName="tablereflection.bmp" objtype="fixture" />
+                        <geometry name="fixture7" geo="" clrr="1.00000000" clrg="0.50196081" clrb="0.00000000" alpha="0.00" reflectivity="0.00" reflectivityBitmapFileName="tablereflection.bmp" objtype="fixture" />
+                        <geometry name="fixture8" geo="" clrr="1.00000000" clrg="0.50196081" clrb="0.00000000" alpha="0.00" reflectivity="0.00" reflectivityBitmapFileName="tablereflection.bmp" objtype="fixture" />
+                        <geometry name="initialstock" geo="initialstock.stl" clrr="0.43137255" clrg="0.65882355" clrb="1.00000000" alpha="0.80" reflectivity="0.00" reflectivityBitmapFileName="" objtype="initialstock" />
+                        <geometry name="stock" geo="stock.stl" clrr="0.42745098" clrg="0.65882355" clrb="1.00000000" alpha="0.40" reflectivity="0.00" reflectivityBitmapFileName="" objtype="stock" />
+                        <geometry name="toolpath" geo="toolpath.asc" clrr="0.80000001" clrg="0.80000001" clrb="0.80000001" alpha="0.00" reflectivity="0.00" reflectivityBitmapFileName="" objtype="toolpath" />
+                        <geometry name="workpiece" geo="workpiece.stl" clrr="0.75294119" clrg="0.75294119" clrb="0.75294119" alpha="0.00" reflectivity="0.40" reflectivityBitmapFileName="tablereflection.bmp" objtype="workpiece" />
+                    </transform>
+                </axis>
+                <geometry name="Povorotnyi_stol" geo="versa_825 - povorotnyi_stol-1.stl" clrr="0.30980393" clrg="0.30980393" clrb="0.30980393" alpha="0.00" reflectivity="0.00" reflectivityBitmapFileName="" objtype="geometry" />
+            </axis>
+            <geometry name="Lylka_povorotnogo_stola" geo="versa_825 - lylka_povorotnogo_stola-1.stl" clrr="0.50196081" clrg="0.50196081" clrb="0.50196081" alpha="0.00" reflectivity="0.00" reflectivityBitmapFileName="" objtype="geometry" />
+        </axis>
+        <axis id="Y" type="translation" x="0.00000000" y="1.00000000" z="0.00000000" minvalue="0.000000" maxvalue="935.000000" valuetype="cont" initial_value="0.000000">
+            <geometry name="Salazki_shpindelya" geo="versa_825 - salazki_shpindelya-1.stl" clrr="0.50196081" clrg="0.50196081" clrb="0.50196081" alpha="0.00" reflectivity="0.00" reflectivityBitmapFileName="" objtype="geometry" />
+            <axis id="Z" type="translation" x="0.00000000" y="0.00000000" z="1.00000000" minvalue="-570.000000" maxvalue="0.000000" valuetype="cont" initial_value="0.000000">
+                <geometry name="Shpindel" geo="versa_825 - shpindel-1.stl" clrr="0.50196081" clrg="0.50196081" clrb="0.50196081" alpha="0.00" reflectivity="0.00" reflectivityBitmapFileName="" objtype="geometry" />
+                <transform id="holder_transform" initialvalue="1.00000000,0.00000000,0.00000000,0.00000000,0.00000000,1.00000000,0.00000000,0.00000000,0.00000000,0.00000000,1.00000000,0.00000000,0.00000000,0.00000000,0.00000000,1.00000000">
+                    <geometry name="tool" geo="tool.stl" alpha="0.00" reflectivity="0.00" reflectivityBitmapFileName="" objtype="tool" cuttr="1.00000000" cuttg="1.00000000" cuttb="0.00000000" noncuttr="0.00000000" noncuttg="0.50196081" noncuttb="0.50196081" arborr="0.00000000" arborg="0.50196081" arborb="0.00000000" holderr="0.50196081" holderg="0.50196081" holderb="0.50196081" />
+                </transform>
+            </axis>
+        </axis>
+        <geometry name="mh_Korpus_panel" geo="versa_825 - korpus_panel-1.stl" clrr="1.00000000" clrg="1.00000000" clrb="1.00000000" alpha="0.00" reflectivity="0.00" reflectivityBitmapFileName="" objtype="geometry" />
+    </transform>
+    <collcheck id="cc1" name="cc1" group1="tool,Shpindel" group2="Lylka_povorotnogo_stola,Rotatcionnyi_stol,Povorotnyi_stol,fixture0,fixture1,fixture2,fixture3,fixture4,fixture5,fixture6,fixture7,fixture8,workpiece" />
+</machine_definition>

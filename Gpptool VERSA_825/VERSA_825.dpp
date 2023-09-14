@@ -1,0 +1,841 @@
+@init_post	
+; Нумерация кадров 
+	blknum_letter = ''
+	blknum_exist = true
+	blknum_gen	 = true
+	blknum_delta = 1
+	blknum		 = 0
+	blknum_max	 = 100000000
+	
+	global string g_file_document ; название файла документации
+	global string g_file_tool_table ; название файла списка инструментов
+	global string g_file_tool_measure ; название файла привязки инструментов
+	global string g_tab_header ; заголовок таблицы инструментов станка
+		g_tab_header = ''
+	global logical g_tab_head_constr ; конструирует шапку таблицы
+		g_tab_head_constr = true
+	global integer g_tool_num
+		g_tool_num = 78
+	global string g_array_TAB<<78, 3>>
+	global string g_array_DOC<<78>>
+	global numeric g_dopTool_value<<3>> ; хранит значения доп. информации для инструментов
+	global string null_tab_string ; нулевая строка
+		null_tab_string = ''
+		
+	global string return_string
+	global logical return_logical
+	global integer return_integer
+
+	global integer reset_tool
+	Input "Obnulyat instrumenty? 1 - yes", reset_tool
+	if reset_tool > 0
+		reset_tool = 1
+	else
+		reset_tool = 0
+	endif
+	
+	global logical tool_is_chamfer ; инструмент относится к типу зенковки
+	global integer l_max_strln l_max_column
+	global string l_symbol 
+	global integer num_iteretion
+	global string l_string_tab
+	global integer j_def_tool
+	global integer j_end k_end
+	global string l_doc_str
+	global integer l_dop_tool
+	global string l_null_str
+	
+	
+	
+endp
+;-------------------------
+@start_of_file
+	
+	g_file_document = path_part + '\\' + 'TOOL_DOCUMENTATION.A'
+	g_file_tool_table = path_part + '\\' + 'TOOL_ADD.T'
+	g_file_tool_measure = path_part + '\\' + 'TOOL_MEASURE.H'
+	{nl, '!! open file = 'g_file_tool_measure'!!' } ; создание файла измерения инструментов
+	{nl, 'BEGIN PGM TOOL_MEASURE MM'}
+	{nl,  '!! close file =' g_file_tool_measure '!!' }
+	
+	{nl, '!! open file = 'g_file_document'!!' } ; создание файла измерения инструментов
+	{nl, 'FILE SOLIDCAM LOCATION : ' part_full_name}
+	{nl, 'N ==> TOOL_NAME ==> HOLDER ==> ID'}
+	{nl,  '!! close file =' g_file_document '!!' }
+	
+endp
+;-------------------------
+@def_tool
+	
+	call @set_dopInfo_tool ; определения доп. значений инструмента
+	
+	call @tool_is_chamfer
+	tool_is_chamfer = return_logical
+
+; формирование строки для файла таблицы инструмента станка
+		if tool_is_chamfer
+			num_iteretion = 3
+		else
+			num_iteretion = 1
+		endif
+		j_def_tool = 0
+		while num_iteretion > j_def_tool
+			l_string_tab = ''
+			call @TOOL_NUMBER_TAB(j_def_tool)
+				l_max_strln = 8
+				l_max_column = 8
+				l_symbol = ' '
+				call @format_string(return_string, l_symbol, l_max_strln, l_max_column)
+				l_string_tab = l_string_tab + return_string
+			call @NAME_TAB
+				l_max_strln = 16
+				l_max_column = 17
+				l_symbol = ' '
+				call @format_string(return_string, l_symbol, l_max_strln, l_max_column)
+				l_string_tab = l_string_tab + return_string
+			call @DOC_TAB(j_def_tool)
+				l_max_strln = 16
+				l_max_column = 17
+				l_symbol = ' '
+				call @format_string(return_string, l_symbol, l_max_strln, l_max_column)
+				l_string_tab = l_string_tab + return_string
+			call @L_TAB
+				l_string_tab = l_string_tab + return_string
+			call @R_TAB
+				l_max_strln = 12
+				l_max_column = 12
+				l_symbol = ' '
+				call @format_string(return_string, l_symbol, l_max_strln, l_max_column)
+				l_string_tab = l_string_tab + return_string
+			call @CUR_TIME_TAB
+				l_string_tab = l_string_tab + return_string
+			call @CUT_TAB
+				l_max_strln = 5
+				l_max_column = 5
+				l_symbol = ' '
+				call @format_string(return_string, l_symbol, l_max_strln, l_max_column)
+				l_string_tab = l_string_tab + return_string
+			call @TTL_OFFS_TAB(j_def_tool)
+				l_max_strln = 12
+				l_max_column = 12
+				l_symbol = ' '
+				call @format_string(return_string, l_symbol, l_max_strln, l_max_column)
+				l_string_tab = l_string_tab + return_string
+			call @TTR_OFFS_TAB
+				l_string_tab = l_string_tab + return_string
+			call @LBREAK_TAB
+				l_string_tab = l_string_tab + return_string
+			if (g_dopTool_value<<(j_def_tool + 1)>> <= 0) & (j_def_tool ne 0)
+				l_string_tab = ''
+			endif
+			
+			g_array_TAB<<tool_number, (j_def_tool + 1)>> = l_string_tab
+			g_tab_head_constr = false
+			j_def_tool = j_def_tool + 1
+		endw
+	
+; формирование строки для файла документации
+	{nl, '!! open file = 'g_file_document'!!' } ; создание файла измерения инструментов
+			l_doc_str = ''
+			l_dop_tool = 0
+		call @TOOL_NUMBER_TAB(l_dop_tool)
+			l_doc_str = l_doc_str + 'T' + return_string
+			l_max_strln = 4
+			l_max_column = 4
+			l_symbol = ' '
+			call @format_string(return_string, l_symbol, l_max_strln, l_max_column)
+			l_doc_str = 'T' + return_string
+		call @TOOL_DESCRIPTION
+			l_doc_str = l_doc_str + return_string
+		if tool_is_chamfer
+			local integer i
+			i = 0
+			while i < 3
+				if g_dopTool_value<<(i + 1)>> > 0
+					l_doc_str = l_doc_str + ' H.' + tostr(i:'5.0(n)') + '=' + tostr(g_dopTool_value<<(i + 1)>>:'5.3(p)')
+				endif
+				i = i + 1 
+			endw
+		endif
+		if msg_mill_tool4 ne ''
+			l_doc_str = l_doc_str + ' ' + msg_mill_tool4
+		endif
+			l_max_strln = 45
+			l_max_column = 46
+			l_symbol = '_'
+			;call @format_string(l_doc_str, l_symbol, l_max_strln, l_max_column)
+			;l_doc_str = return_string
+		call @TOOL_HOLDER_DOC
+			l_max_strln = 26
+			l_max_column = 27
+			l_symbol = '_'
+			l_doc_str = l_doc_str + ' || ' + return_string
+			;call @format_string(return_string, l_symbol, l_max_strln, l_max_column)
+			;l_doc_str = l_doc_str + return_string
+		if tool_id_string ne ''
+			l_doc_str = l_doc_str + ' || ID: ' + tool_id_string
+		else
+			l_doc_str = l_doc_str + ' || ID: NOT_ID'
+		endif
+			{nl, l_doc_str}
+			
+	{nl,  '!! close file =' g_file_document '!!' }
+	
+; формирование строки для файла привязки инструмента
+	{nl, '!! open file = 'g_file_tool_measure'!!' } ; создание файла измерения инструментов
+		if tool_is_chamfer
+			num_iteretion = 3
+		else
+			num_iteretion = 1
+		endif
+		j_def_tool = 0
+		while j_def_tool < num_iteretion
+			if (g_dopTool_value<<(j_def_tool + 1)>> > 0) or (j_def_tool == 0)
+				l_doc_str = ''
+				call @TOOL_NUMBER_TAB(j_def_tool)
+					l_doc_str = l_doc_str + 'T' + return_string + ' '
+				call @TOOL_DESCRIPTION
+					l_doc_str = l_doc_str + return_string
+				if (g_dopTool_value<<(j_def_tool + 1)>> > 0) & tool_is_chamfer
+					l_doc_str = l_doc_str + ' H.' + tostr(j_def_tool:'5.3(p)') + '=' + tostr(g_dopTool_value<<(j_def_tool + 1)>>:'5.3(p)')
+				endif
+				if msg_mill_tool4 ne ''
+					l_doc_str = l_doc_str + ' ' + msg_mill_tool4
+				endif
+				call @TOOL_HOLDER_DOC
+					l_doc_str = l_doc_str + ' || ' + return_string
+				{nb, '* - ' l_doc_str} ; коментарий инструмента
+				call @TOOL_NUMBER_TAB(j_def_tool)
+					l_doc_str = return_string
+					l_doc_str = 'TOOL CALL ' + l_doc_str + ' Z S'
+				call @tool_speen ; возвращает integer
+					l_doc_str = l_doc_str + tostr(return_integer:'5.0(n)')
+				{nb, l_doc_str} ; вызов инструмента
+				call @TTL_OFFS_TAB(j_def_tool)
+					local numeric flag_measer
+					flag_measer = tonum(return_string)
+				if flag_measer > 0
+					flag_measer = 0
+				else
+					flag_measer = 1
+				endif
+				{nb, '  TCH PROBE 584 TOOL SETTING L,R ~'}
+				{nl, '    Q350=+0    ;MEASURING TYPE ~'}
+				{nl, '    Q351=' flag_measer:'+5.0(p)' '    ;APPLICATION ~'}
+				{nl, '    Q352=+0    ;CUTTING EDGE CONTROL ~'}
+				{nl, '    Q355=-1    ;MEASURING POSITION ~'}
+				{nl, '    Q361=+3    ;NUMBER OF MEASURINGS ~'}
+				{nl, '    Q362=+0.02 ;SCATTER TOLERANCE ~'}
+				{nl, '    Q359=+0    ;ADD. LENGTH CORRECT. ~'}
+				{nl, '    Q360=+0    ;ADD. RADIUS CORRECT.'}
+			endif
+			j_def_tool = j_def_tool + 1
+		endw
+	{nl,  '!! close file =' g_file_tool_measure '!!' }
+	
+endp
+;-------------------------
+@end_program
+	
+	{nl, '!! open file = 'g_file_tool_measure'!!' }
+	{nb, 'END PGM TOOL_MEASURE MM'}
+	{nl,  '!! close file =' g_file_tool_measure '!!' }
+	
+	{nl, '!! open file = 'g_file_tool_table'!!' } ; создание файла измерения инструментов
+	{nl, 'BEGIN TOOL_ADD   .T MM'}
+	{nl, g_tab_header}
+		j_end = 1
+	while j_end <= g_tool_num
+		l_null_str = ''
+		k_end = 1
+		while k_end <= 3
+			if g_array_TAB<<j_end, k_end>> ne ''
+				{nl, g_array_TAB<<j_end, k_end>>}
+			else
+				if (k_end == 1) & (reset_tool == 1)
+					l_max_strln = 8
+					l_max_column = 8
+					l_symbol = ' '
+					return_string = tostr(j_end:'5.0(n)')
+					call @format_string(return_string, l_symbol, l_max_strln, l_max_column)
+					l_null_str = return_string + null_tab_string
+					{nl, l_null_str}
+				endif
+			endif
+			k_end = k_end + 1
+		endw
+		j_end = j_end + 1
+	endw
+		
+	{nl, '[END]'}
+	{nl,  '!! close file =' g_file_tool_table '!!' }
+endp
+;-------------------------
+
+	;+----------------------------------------+
+	;|				User procedures		  	  |
+	;+----------------------------------------+	
+
+@set_dopInfo_tool
+	; преобразовывает информацию из 3-х коментарий инструментов в numeric и сохраняет их в массив
+		if msg_mill_tool1 ne ''
+			g_dopTool_value<<1>> = abs(tonum(msg_mill_tool1))
+		else
+			g_dopTool_value<<1>> = 0
+		endif
+		if msg_mill_tool2 ne '' 
+			g_dopTool_value<<2>> = abs(tonum(msg_mill_tool2))
+		else
+			g_dopTool_value<<2>> = 0
+		endif
+		if msg_mill_tool3 ne '' 
+			g_dopTool_value<<3>> = abs(tonum(msg_mill_tool3))
+		else
+			g_dopTool_value<<3>> = 0
+		endif
+endp
+;=============================
+@TOOL_HOLDER_DOC
+	
+	if holder_name ne ''
+		call @tool_is_chamfer
+		if return_logical
+			local numeric add_length
+			add_length = 0
+			local integer i
+			i = 0
+			while i < 3
+				if g_dopTool_value<<(i + 1)>> > add_length
+					add_length = g_dopTool_value<<(i + 1)>>
+				endif
+				i = i + 1
+			endw
+			return_string = holder_name + ' H=' + tostr((tool_length + add_length):'5.3(p)')
+		else
+			if tool_type == slot_mill
+				if g_dopTool_value<<1>> > 0
+					return_string = holder_name + ' H=' + tostr((tool_length + g_dopTool_value<<1>>):'5.3(p)')
+				else
+					return_string = holder_name + ' H=' + tostr(tool_length:'5.3(p)')
+				endif
+			else
+				return_string = holder_name + ' H=' + tostr(tool_length:'5.3(p)')
+			endif
+		endif
+	else 
+		return_string = 'HOLDER UNDEFINED'
+	endif
+	
+endp
+;=============================
+@TOOL_DESCRIPTION
+	
+	local string l_tool_D ; диаметр инструмента
+		l_tool_D = tostr((tool_offset * 2):'5.3(p)')
+	return_string = 'FREZA' + ' D' + l_tool_D
+	
+	; \\define SVERLO
+	if (tool_type == drill)
+		return_string = 'SVERLO' + ' D' + l_tool_D
+	endif
+	; \\define METCHIK
+	if (tool_type == tap_mill)
+		return_string = 'METCHIK' + ' M' + l_tool_D
+		return_string = return_string + 'x' + tostr(tool_drill_lead:'5.3(p)')
+	endif
+	; \\define T_FREZA
+	if (tool_type == slot_mill)
+		return_string = 'T-FREZA' + ' D' + l_tool_D
+		return_string = return_string + ' B' + tostr(cutting_tool_length:'5.3(p)') + ' '
+		if msg_mill_tool5 ne ''
+			return_string = return_string + msg_mill_tool5 + ' '
+		endif
+		if g_dopTool_value<<1>> > 0
+			return_string = return_string + 'H1=' + tostr(g_dopTool_value<<1>>:'5.3(p)') + ' H2=' + tostr((g_dopTool_value<<1>> + cutting_tool_length):'5.3(p)')
+		else
+			if g_dopTool_value<<2>> > 0
+				if corner_radius > 0
+					return_string = return_string + 'Rniz' + tostr(corner_radius:'5.3(p)') + ' '
+				endif
+				return_string = return_string + 'Rverh' + tostr(g_dopTool_value<<2>>:'5.3(p)') + ' '
+			else
+				if corner_radius > 0
+					return_string = return_string + 'R' + tostr(corner_radius:'5.3(p)')
+				endif
+			endif
+		endif
+	endif
+	; \\define T_FREZA_CUT
+	if (tool_type == dove_mill)
+		return_string = 'T-FREZA_CUT' + ' D' + l_tool_D + ' A' + tostr(tool_angle:'5.3(p)')
+	endif
+	; \\define SF_FREZA
+	if (tool_type == ball_nose)
+		return_string = 'SF-FREZA' + ' D' + l_tool_D
+		return_string = return_string + ' R' + tostr(corner_radius:'5.3(p)')
+	endif
+	; \\define R_FREZA
+	if (tool_type == 1)
+		return_string = 'R-FREZA' + ' D' + l_tool_D
+		return_string = return_string + ' R' + tostr(corner_radius:'5.3(p)')
+	endif
+	; \\define BALL_FREZA
+	if (tool_type == lollipop_mill)
+		return_string = 'BALL-FREZA' + ' D' + l_tool_D
+		return_string = return_string + ' R' + tostr(corner_radius:'5.3(p)')
+	endif
+	; \\define CUT_FREZA
+	if (tool_type == taper_mill)
+		return_string = 'CUT-FREZA' + ' D' + l_tool_D + ' A' + tostr(tool_angle:'5.3(p)')
+	endif
+	; \\define CUT_FREZA_R
+	if (tool_type == 25)
+		return_string = 'CUT-FREZA_R' + ' D' + l_tool_D
+		if tool_taper_angle > 0
+			return_string = return_string + ' A' + tostr(tool_taper_angle:'5.3(p)')
+		endif
+		return_string = return_string + ' R' + tostr(corner_radius:'5.3(p)')
+	endif
+	; \\define GRAVER
+	if (tool_type == engraving_mill)
+		return_string = 'GRAVER' + ' D' + l_tool_D
+		return_string = return_string + ' R' + tostr(corner_radius:'5.3(p)')
+	endif
+	; \\define TSENTR_SVERLO
+	if (tool_type == center_drill)
+		return_string = 'TSENTR-SVERLO' + ' D' + l_tool_D + ' A' + tostr(tool_angle:'5.3(p)')
+	endif
+	; \\define TSENTROVKA
+	if (tool_type == spot_drill)
+		return_string = 'TSENTROVKA' + ' D' + l_tool_D + ' A' + tostr(tool_angle:'5.3(p)')
+	endif
+	; \\define ZENKOVKA
+	if (tool_type == chamfer_drill) 
+		return_string = 'ZENKOVKA' + ' D' + l_tool_D + ' A' + tostr(tool_angle:'5.3(p)')
+	endif
+	; \\define REZBOFREZA
+	if tool_type == thread_mill
+		return_string = 'REZBOFREZA' + ' D' + l_tool_D
+		return_string = return_string + 'x' + tostr(tool_drill_lead:'5.3(p)')
+	endif
+	; \\define REZETS
+	if (tool_type == bore)
+		return_string = 'REZETS' + ' D' + l_tool_D
+	endif
+	; \\define RAZVYORTKA
+	if (tool_type == reamer_mill)
+		return_string = 'RAZVYORTKA' + ' D' + l_tool_D
+	endif
+
+endp
+;=============================
+@TOOL_NUMBER_TAB(integer number_dopTool)
+	
+	if g_tab_head_constr
+		g_tab_header = g_tab_header + 'T       '
+	endif
+	
+	return_string = tostr(tool_number:'5.0(n)')
+	if (g_dopTool_value<<(number_dopTool + 1)>> > 0) & (number_dopTool ne 0)
+		return_string = return_string + '.' + tostr(number_dopTool:'5.0(n)')
+	endif
+
+endp
+;=============================
+@NAME_TAB
+	
+	if g_tab_head_constr
+		g_tab_header = g_tab_header + 'NAME             '
+		null_tab_string = null_tab_string + '                 '
+	endif
+	
+	;tool_type: FREZA => namber: 20
+	;tool_type: R_FREZA => namber: 1
+	;tool_type: ZENKOVKA => namber: 10
+	;tool_type: REZETS => namber: 17
+	;tool_type: SVERLO => namber: 0
+	;tool_type: METCHIK => namber: 12
+	;tool_type: TCUT_FREZA => namber: 11
+	;tool_type: T_FREZA => namber: 7
+	;tool_type: SF_FREZA => namber: 15
+	;tool_type: BALL_FREZA => namber: 8
+	;tool_type: CUT_FREZA => namber: 9
+	;tool_type: RCUT_FREZA => namber: 25
+	;tool_type: GRAVER => namber: 19
+	;tool_type: TSENTR_SVERLO => namber: 18
+	;tool_type: TSENTROVKA => namber: 21
+	;tool_type: RAZVYORTKA => namber: 16
+	
+	local string l_tool_D ; диаметр инструмента
+		l_tool_D = tostr((tool_offset * 2):'5.3(p)')
+	return_string = 'FREZA' + '_D' + l_tool_D
+	
+	; \\define SVERLO
+	if (tool_type == drill)
+		return_string = 'SVERLO' + '_D' + l_tool_D
+	endif
+	; \\define METCHIK
+	if (tool_type == tap_mill)
+		return_string = 'METCHIK' + '_M' + l_tool_D
+		return_string = return_string + 'x' + tostr(tool_drill_lead:'5.3(p)')
+	endif
+	; \\define T_FREZA
+	if (tool_type == slot_mill)
+		return_string = 'T_FR' + '_D' + l_tool_D
+		return_string = return_string + 'B' + tostr(cutting_tool_length:'5.3(p)')
+	endif
+	; \\define T_FREZA_CUT
+	if (tool_type == dove_mill)
+		return_string = 'T_FR_CUT' + '_D' + l_tool_D
+	endif
+	; \\define SF_FREZA
+	if (tool_type == ball_nose)
+		return_string = 'SF_FR' + '_D' + l_tool_D
+		return_string = return_string + '_R' + tostr(corner_radius:'5.3(p)')
+	endif
+	; \\define R_FREZA
+	if (tool_type == 1)
+		return_string = 'R_FR' + '_D' + l_tool_D
+		return_string = return_string + '_R' + tostr(corner_radius:'5.3(p)')
+	endif
+	; \\define BALL_FREZA
+	if (tool_type == lollipop_mill)
+		return_string = 'BALL_FR' + '_D' + l_tool_D
+		return_string = return_string + '_R' + tostr(corner_radius:'5.3(p)')
+	endif
+	; \\define CUT_FREZA
+	if (tool_type == taper_mill)
+		return_string = 'CUT_FR' + '_D' + l_tool_D
+	endif
+	; \\define CUT_FREZA_R
+	if (tool_type == 25)
+		return_string = 'CUT_FR_R' + '_D' + l_tool_D
+	endif
+	; \\define GRAVER
+	if (tool_type == engraving_mill)
+		return_string = 'GRAVER' + '_D' + l_tool_D
+		return_string = return_string + '_R' + tostr(corner_radius:'5.3(p)')
+	endif
+	; \\define TSENTR_SVERLO
+	if (tool_type == center_drill)
+		return_string = 'TS_SVERLO' + '_D' + l_tool_D
+	endif
+	; \\define TSENTROVKA
+	if (tool_type == spot_drill)
+		return_string = 'TSENTR' + '_D' + l_tool_D
+	endif
+	; \\define ZENKOVKA
+	if (tool_type == chamfer_drill) 
+		return_string = 'ZENKOVKA' + '_D' + l_tool_D
+	endif
+	; \\define REZBOFREZA
+	if tool_type == thread_mill
+		return_string = 'REZBOFR' + '_D' + l_tool_D
+		return_string = return_string + 'x' + tostr(tool_drill_lead:'5.3(p)')
+	endif
+	; \\define REZETS
+	if (tool_type == bore)
+		return_string = 'REZETS' + '_D' + l_tool_D
+	endif
+	; \\define RAZVYORTKA
+	if (tool_type == reamer_mill)
+		return_string = 'RAZVYORTKA' + '_D' + l_tool_D
+	endif
+
+endp
+;=============================
+@DOC_TAB(integer number_dopTool)
+	
+	if g_tab_head_constr
+		g_tab_header = g_tab_header + 'DOC              '
+		null_tab_string = null_tab_string + '                 '
+	endif
+	
+	return_string = ''
+	
+	; \\define T_FREZA
+	if (tool_type == slot_mill)
+		if msg_mill_tool5 ne ''
+			return_string = msg_mill_tool5 + ' '
+		endif
+		if g_dopTool_value<<1>> > 0
+			return_string = return_string + 'H1=' + tostr(g_dopTool_value<<1>>:'5.3(p)') + ' H2=' + tostr((g_dopTool_value<<1>> + cutting_tool_length):'5.3(p)')
+		else
+			if g_dopTool_value<<2>> > 0
+				if corner_radius > 0
+					return_string = 'Rniz' + tostr(corner_radius:'5.3(p)') + ' '
+				endif
+				return_string = return_string + 'Rverh' + tostr(g_dopTool_value<<2>>:'5.3(p)') + ' '
+			else
+				if corner_radius > 0
+					return_string = 'R' + tostr(corner_radius:'5.3(p)')
+				endif
+			endif
+		endif
+	endif
+	; \\define T_FREZA_CUT
+	if (tool_type == dove_mill)
+		return_string = 'A' + tostr(tool_angle:'5.3(p)')
+		if g_dopTool_value<<(number_dopTool + 1)>> > 0
+			return_string = return_string + ' H=' + tostr((g_dopTool_value<<(number_dopTool + 1)>>):'5.3(p)')
+		endif
+	endif
+	; \\define CUT_FREZA
+	if (tool_type == taper_mill)
+		return_string = 'A' + tostr(tool_angle:'5.3(p)')
+		if g_dopTool_value<<(number_dopTool + 1)>> > 0
+			return_string = return_string + ' H=' + tostr((g_dopTool_value<<(number_dopTool + 1)>>):'5.3(p)')
+		endif
+	endif
+	; \\define TSENTROVKA
+	if (tool_type == spot_drill)
+		return_string = 'A' + tostr(tool_angle:'5.3(p)')
+		if g_dopTool_value<<(number_dopTool + 1)>> > 0
+			return_string = return_string + ' H=' + tostr((g_dopTool_value<<(number_dopTool + 1)>>):'5.3(p)')
+		endif
+	endif
+	; \\define ZENKOVKA
+	if (tool_type == chamfer_drill) 
+		return_string = 'A' + tostr(tool_angle:'5.3(p)')
+		if g_dopTool_value<<(number_dopTool + 1)>> > 0
+			return_string = return_string + ' H=' + tostr((g_dopTool_value<<(number_dopTool + 1)>>):'5.3(p)')
+		endif
+	endif
+	; \\define CUT_FREZA_R
+	if (tool_type == 25)
+		if tool_taper_angle > 0
+			return_string = 'A' + tostr(tool_taper_angle:'5.3(p)')
+		endif
+		return_string = return_string + ' R' + tostr(corner_radius:'5.3(p)')
+	endif
+	; \\define TSENTR_SVERLO
+	if (tool_type == center_drill)
+		return_string = 'A' + tostr(corner_radius:'5.3(p)')
+	endif
+	
+	if msg_mill_tool4 ne ''
+		return_string = return_string + ' ' + msg_mill_tool4
+	endif
+	
+endp
+;=============================
+@L_TAB
+	
+	if g_tab_head_constr
+		g_tab_header = g_tab_header + 'L           '
+		null_tab_string = null_tab_string + '+0          '
+	endif
+	
+	return_string = '+0          '
+	
+endp
+;=============================
+@R_TAB
+	
+	if g_tab_head_constr
+		g_tab_header = g_tab_header + 'R           '
+		null_tab_string = null_tab_string + '+0          '
+	endif
+	
+	return_string = '+' + tostr(tool_offset:'5.3(p)')
+	
+endp
+;=============================
+@CUR_TIME_TAB
+	
+	if g_tab_head_constr
+		g_tab_header = g_tab_header + 'CUR.TIME '
+		null_tab_string = null_tab_string + '0        '
+	endif
+	
+	return_string = '0        '
+	
+endp
+;=============================
+@CUT_TAB
+	
+	if g_tab_head_constr
+		g_tab_header = g_tab_header + 'CUT. '
+		null_tab_string = null_tab_string + '0    '
+	endif
+	
+	return_string = tostr(tool_teeth_number:'5.0(n)')
+
+endp
+;=============================
+@TTL_OFFS_TAB(integer number_dopTool)
+	
+	if g_tab_head_constr
+		g_tab_header = g_tab_header + 'TT:L-OFFS   '
+		null_tab_string = null_tab_string + '+0          '
+	endif
+	
+	return_string = '+0.7        '
+	
+	; \\define T_FREZA
+	if (tool_type == slot_mill)
+		return_string = '+' + tostr(((cutting_tool_length / 2) + g_dopTool_value<<1>>):'5.3(p)')
+	endif
+	; \\define T_FREZA_CUT
+	if (tool_type == dove_mill)
+		if g_dopTool_value<<(number_dopTool + 1)>> > 0
+			return_string = '+' + tostr((g_dopTool_value<<(number_dopTool + 1)>>):'5.3(p)')
+		else
+			return_string = '+0          '
+		endif
+	endif
+	; \\define CUT_FREZA
+	if (tool_type == taper_mill)
+		if g_dopTool_value<<(number_dopTool + 1)>> > 0
+			return_string = '+' + tostr((g_dopTool_value<<(number_dopTool + 1)>>):'5.3(p)')
+		else
+			return_string = '+0          '
+		endif
+	endif
+	; \\define TSENTROVKA
+	if (tool_type == spot_drill)
+		if g_dopTool_value<<(number_dopTool + 1)>> > 0
+			return_string = '+' + tostr((g_dopTool_value<<(number_dopTool + 1)>>):'5.3(p)')
+		else
+			return_string = '+0          '
+		endif
+	endif
+	; \\define ZENKOVKA
+	if (tool_type == chamfer_drill) 
+		if g_dopTool_value<<(number_dopTool + 1)>> > 0
+			return_string = '+' + tostr((g_dopTool_value<<(number_dopTool + 1)>>):'5.3(p)')
+		else
+			return_string = '+0          '
+		endif
+	endif
+	; \\define SF_FREZA
+	if (tool_type == ball_nose)
+		return_string = '+' + tostr((corner_radius):'5.3(p)')
+	endif
+	; \\define R_FREZA
+	if (tool_type == 1)
+		return_string = '+' + tostr((corner_radius):'5.3(p)')
+	endif
+	; \\define BALL_FREZA
+	if (tool_type == lollipop_mill)
+		return_string = '+' + tostr((corner_radius):'5.3(p)')
+	endif
+	; \\define CUT_FREZA_R
+	if (tool_type == 25)
+		return_string = '+' + tostr((corner_radius):'5.3(p)')
+	endif
+	; \\define REZETS
+	if (tool_type == bore)
+		return_string = '+' + tostr((corner_radius):'5.3(p)')
+	endif
+	; \\define RAZVYORTKA
+	if (tool_type == reamer_mill)
+		return_string = '+0          '
+	endif
+	; \\define REZBOFREZA
+	if tool_type == thread_mill
+		return_string = '+0          '
+	endif
+	; \\define GRAVER
+	if (tool_type == engraving_mill)
+		return_string = '+0          '
+	endif
+	; \\define TSENTR_SVERLO
+	if (tool_type == center_drill)
+		return_string = '+0          '
+	endif
+	; \\define SVERLO
+	if (tool_type == drill)
+		return_string = '+0          '
+	endif
+	; \\define METCHIK
+	if (tool_type == tap_mill)
+		return_string = '+0          '
+	endif
+
+endp
+;=============================
+@TTR_OFFS_TAB
+	
+	if g_tab_head_constr
+		g_tab_header = g_tab_header + 'TT:R-OFFS   '
+		null_tab_string = null_tab_string + '+0          '
+	endif
+	
+	return_string = '+0          '
+
+endp
+;=============================
+@LBREAK_TAB
+	
+	if g_tab_head_constr
+		g_tab_header = g_tab_header + 'LBREAK  '
+		null_tab_string = null_tab_string + '0.0     '
+	endif
+	
+	return_string = '0.4     '
+
+endp
+;=============================
+@tool_is_chamfer
+	
+	return_logical = false
+	if tool_type == taper_mill; \\define CUT_FREZA
+		return_logical = true
+	endif
+	if tool_type == spot_drill; \\define TSENTROVKA
+		return_logical = true
+	endif
+	if tool_type == chamfer_drill; \\define ZENKOVKA
+		return_logical = true
+	endif
+	if tool_type == dove_mill; \\define T_FREZA_CUT
+		return_logical = true
+	endif
+
+endp
+;=============================
+@format_string(string l_str, string l_symbol, integer max_strln, integer max_column)
+	
+	; подгоняет строку под формат столбца
+		if strlen(l_str) > max_strln
+			l_str = left(l_str, max_strln)
+		endif
+	if max_strln > max_column
+		max_column = max_strln
+	endif
+	l_str = l_str + dup(l_symbol, (max_column - strlen(l_str))) 
+	return_string = l_str
+	
+endp
+;=============================
+@tool_speen
+	
+	return_integer = 2000
+	; \\define SVERLO
+	if (tool_type == drill)
+		if spin > 2000
+			return_integer = 2000
+		else
+			if spin < 1200
+				return_integer = 1200
+			else
+				return_integer = spin
+			endif
+		endif
+	endif
+	; \\define METCHIK
+	if (tool_type == tap_mill)
+		return_integer = 1800
+	endif
+	; \\define REZETS
+	if (tool_type == bore)
+		return_integer = 1200
+	endif
+	; \\define RAZVYORTKA
+	if (tool_type == reamer_mill)
+		return_integer = 1600
+	endif
+	
+endp
+;=============================

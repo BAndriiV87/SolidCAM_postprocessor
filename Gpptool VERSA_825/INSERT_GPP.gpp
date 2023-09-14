@@ -1,0 +1,2967 @@
+@init_post
+; Нумерация кадров
+	blknum_letter = ''
+	blknum_exist = true
+	blknum_gen	 = true
+	blknum_delta = 1
+	blknum		 = 0
+	blknum_max	 = 1000000000
+
+; Формат вывода
+	remove_blanks = 0 ; пробелы не удаляются из кода
+	numeric_def_f = '+5.3(p)' ; формат отображения вещественных чисел
+	integer_def_f = '+5.0(p)' ; формат отображения целых чисел
+	xpos_f = '+5.3(p)' ; формат показа оси X
+	ypos_f = '+5.3(p)' ; формат показа оси Y
+	zpos_f = '+5.3(p)' ; формат показа оси Z
+	apos_f  = '+5.3(p)' ; формат показа оси A or C
+	feed_f = '5.0(n)'; формат показа подачи
+	
+; Уровень трассировки
+	;local integer trace_level
+	;Input "Trace level : 0-None; 5 - All", trace_level
+	;trace "all":trace_level
+	
+; Глобальные переменные
+	; Переменные хранящие последние определенные координаты смещения нулевой точки
+	global numeric g_x_home_old	g_y_home_old g_z_home_old g_a_home_old g_c_home_old
+		g_x_home_old = 0
+		g_y_home_old = 0
+		g_z_home_old = 0
+		g_a_home_old = 0
+		g_c_home_old = 0
+	global integer g_mac_number ; хранит последнее значение MAC (опорной точки станка)
+		g_mac_number = -1
+	global string g_kompensetion; индекс компенсации инструмента
+	global string g_arc_direction; индекс направление перемещени¤ на дугах по/против часовой стрелке
+	global string g_job_name g_home_userName; имя перехода и им¤ нулевой точки
+	global string g_mac_part_home ; имя состоящее из MAC и POSITION
+	global string g_transform_name ; имя трансформации
+		g_transform_name = '' ; означает, что при запуске трансформации нет
+	global numeric four_axis_transf_angel ; угол трансформации для типа (4-я ось)
+		four_axis_transf_angel = 0
+; параметры для трансформации
+	global numeric g_shift_x_tr g_shift_y_tr g_shift_z_tr ; координаты смещени¤ при трансформации
+	global numeric g_normal_to_plane_x g_normal_to_plane_y g_normal_to_plane_z ; нормаль к поверхности
+	global integer g_SEQ_transform ; определение направление поворота оси A 
+	global logical transform_4x ; флаг трансформации 4-я ось
+		transform_4x = false
+	global logical g_transf_eq ; флаг для отображения идентичных трансформации последовательно
+		g_transf_eq = false
+	
+	global integer g_counter ; переменная счетчик для подсчёта
+	global numeric g_xnext g_ynext ; координата первой позиции в переходе
+	global integer g_dop_tool_number ; номер дополнительного инструмента
+	global logical g_otkluchenie_tormozov ; флаг отключения тормозов на поворотных осях
+
+; параметры сверления
+	global numeric g_safety_Q200 ; безопасное рассто¤ние 
+	global numeric g_surface_Q203 ; координата поверхности
+	global numeric g_clearance_plane_Q204 ; 2-е безопасное рассто¤ние
+	global numeric g_depth_Q201 ; глубина сверления
+	global integer g_type_cycle ; тип цикла сверления
+	global numeric g_cutting_tool_length ; ширина т-фрезы
+		g_cutting_tool_length = 0
+	global numeric g_xpos g_ypos
+	global integer g_drill_type ; тип цикла 
+; переменные состояния
+	global logical g_tool_change ; - состо¤ние смены инструмента. true - если смена произошла
+		g_tool_change = true
+	global logical g_last_job5x ; - состо¤ние X5_job на прошлом переходе
+		g_last_job5x = false
+	global logical g_first_rapid_move;  - указывает, является перемещение координат станка первым в переходе
+	global string g_transform_plane_status ; статус трансформации
+		g_transform_plane_status = 'stop' ; трансформаци¤ отсутствует
+	global logical g_end_of_job ; указывает, что job закончен. ѕроцедура не находитс¤ в зоне @start_of_job
+		g_end_of_job = true
+	global logical g_polomka_LBL ; устанавливает флаг использования поломки для включения в конце LBL
+		g_polomka_LBL = false
+	global logical g_polomka_use ; устанавливает флаг использования поломки
+	global logical g_mco_use ; показывает, что выполняется контроль установок станка
+		g_mco_use = false
+; переменные сож
+	global string g_status_coolent ; статус сож
+		g_status_coolent = ''
+	global integer g_through_coolant_val ; значение давления сож
+		g_through_coolant_val = 75
+	global integer g_waiting_time ; выдержка времени
+;  константы
+	global numeric NULL ; константа дл¤ обнулени¤ значений
+		NULL = 0
+; массивы
+	global integer MAX_DOPTOOL_NUMBER ; макимальное количество дополнительных инструментов
+		MAX_DOPTOOL_NUMBER = 3
+	global numeric g_dopTool_value<<3>> ; - хранит информацию о всех доп инструментах 
+			; (прин¤то максимальное количество доп.инстр = 4)
+	; начальные значени¤ массива
+	g_dopTool_value<<1>> = 0
+	g_dopTool_value<<2>> = 0
+	g_dopTool_value<<3>> = 0
+
+; глобальные переменные возвращающиееся из функций
+	global string return_string
+	global logical return_logical
+	global integer return_integer
+	global numeric return_numeric
+	
+; настройка постпроцессора
+	global logical s_tool_coment 
+		s_tool_coment = false	; 0 - выводить коментарий сгенерированый постпроцессором
+								; 1 - выводить пользовательский коментарий
+endp
+;-------------------------
+@start_of_file
+	
+	{nb, 'BEGIN PGM 'g_file_name ' MM'} ; наименование программы
+	{nb, '; FILE LOCATION : ' part_full_name}
+	{nb, '; Vremya obrabotki:  00:00:00'}
+	{nb, 'CALL LBL "description_tool"'}
+	{nb, '*=== ALL TOOL DEFINITION ==='}
+
+endp
+;-------------------------
+@def_tool
+	
+	; список инструментов, их параметров и используемых оправок с вылетом 
+	; инструментов в заголовке начала файла УП
+		{nb, '; - T' tool_number:'5.0(n)' ' '} ; номер инструмента
+	; определить тип инструмента и основные геометричекие параметры
+		call @toolType_geometryParameters ;return_string
+		{return_string} ; вывод типа и геометр. параметров
+	
+	call @set_dopTool_value
+	
+	; дополнительный коментарий записанный пользователем вставляется перед оправкой
+		if msg_mill_tool4 ne ''
+			{' ' msg_mill_tool4}
+		endif
+	
+	; определить наличие оправки, ее тип и вылет инструмента из оправки
+		if holder_name ne ''
+			if (tool_type == taper_mill) or (tool_type == spot_drill) or (tool_type == chamfer_drill) or (tool_type == dove_mill)
+				local numeric add_length
+				add_length = 0
+				local integer i
+				i = 0
+				while i < 3
+					if g_dopTool_value<<(i + 1)>> > add_length
+						add_length = g_dopTool_value<<(i + 1)>>
+					endif
+					i = i + 1
+				endw
+				{' || HOLDER: ' + holder_name + ' H=' + tostr((tool_length + add_length):'5.3(p)')}
+			else
+				if tool_type == slot_mill
+					if g_dopTool_value<<1>> > 0
+						{' || HOLDER: ' + holder_name + ' H=' + tostr((tool_length + g_dopTool_value<<1>>):'5.3(p)')}
+					else
+						{' || HOLDER: ' + holder_name + ' H=' + tostr(tool_length:'5.3(p)')}
+					endif
+				else
+					{' || HOLDER: ' + holder_name + ' H=' + tostr(tool_length:'5.3(p)')}
+				endif
+			endif
+		else 
+			{' || HOLDER: UNDEFINED'}
+		endif
+	
+endp
+;-------------------------
+@start_program
+	
+	{nb, 'LBL "description_tool"'}
+	{nb, '*=== START PROGRAMM ==='}
+	
+endp
+;-------------------------
+@home_number
+	
+endp
+;-------------------------
+@tool_breakage
+	
+	if (tolerance_len ne 0) & not(g_mco_use)
+		g_polomka_LBL = true
+		g_polomka_use = true
+	endif
+	
+	if g_mco_use
+		{nb, 'FN 18: SYSREAD Q65 = ID20 NR1'}
+		{nb, 'TCH PROBE 586 TOOL BREAKAGE DETECT ~'}
+		{nl, '	Q356=+1    ;MEAS. DIRECTION ~'}
+		{nl, '	Q357=+0    ;RADIAL OFFSET ~'}
+		{nl, '	Q359=+0    ;ADD. LENGTH CORRECT. ~'}
+		{nl, '	Q375=+0    ;APPROACH STRATEGY ~'}
+		{nl, '	Q376=+200  ;SAFETY DISTANCE'}
+		{nb, 'TOOL CALL Q65 Z ; define blocking tool'}
+	endif
+	
+endp
+;-------------------------
+@change_tool
+	
+	; отключение сож 
+	if not(first_tool) & not(g_mco_use)
+		call @stop_coolent(g_status_coolent)
+	endif
+	
+	g_dop_tool_number = 0 ; изначально дополнительный инструмент отсутствует
+	
+	g_otkluchenie_tormozov = false ; устанавливает отключение тормозов при каждой смене инструмента
+	
+	; сброс имен перехода. Так как после смены инструмента имя должно вызываться в любом случае
+		g_job_name = ''
+		g_tool_change = true ; произошла смена инструмента
+		g_type_cycle = -1 ; устанавливается не существующий тип цикла
+	
+	; вызов сброса нулевой точки перед сменой инструмента
+		if not(g_mco_use)
+			call @reset_home
+		endif
+	; проверка излома инструмента
+		if g_polomka_use & not(first_tool) & not(g_mco_use)
+			{nb, 'CALL LBL "POLOMKA" ; tool break control' }
+			{nb, 'TOOL CALL Q65 Z ; define blocking tool'}
+		endif
+		g_polomka_use = false
+	; проверка излома инструмента поддержка старого варианта
+		if msr_len
+			g_polomka_LBL = true
+			g_polomka_use = true
+		endif
+		
+	local string l_tool_number; - номер инструмента по умолчанию как и в solidcam.
+	l_tool_number = tostr(tool_number:'5.0(n)')
+	
+	; преобразовывает информацию из 3-х коментарий инструментов в numeric и сохраняет их в массив
+		call @set_dopTool_value
+
+	; определяет дополнительные параметры инструментов связанные с значениями в коментариях инструментов
+	; только при вызове инструмента определ¤ет и устанавливает все значения доп инструментов
+	local string l_dopTool_info ; хранит строку с доп. параметрами инструмента, если таковы имеютс¤
+	l_dopTool_info = ''
+	g_cutting_tool_length = 0
+	if (job_type == 'drill') or (job_type == 'drill_hr') or (job_type eq 'mw_drill_5x')
+		local string l_type_dopTool ; переменна¤ хранящая ключ к тому как будет интерпретироваться
+							; значения сохранЄнные в массиве доп. инструментов
+		l_type_dopTool = '' ; - устанавливает начальное состояние. тип не содержит
+
+		; определить имеет тип инструмента, текущего перехода, доп. инструмент
+			if tool_type == slot_mill; \\define T_FREZA
+				l_type_dopTool = 't_slot'
+				g_cutting_tool_length = cutting_tool_length ; ширина т-фрезы
+			endif
+			if tool_type == taper_mill; \\define CUT_FREZA
+				l_type_dopTool = 'chamfer'
+			endif
+			if tool_type == spot_drill; \\define TSENTROVKA
+				l_type_dopTool = 'chamfer'
+			endif
+			if tool_type == chamfer_drill; \\define ZENKOVKA
+				l_type_dopTool = 'chamfer'
+			endif
+			if tool_type == dove_mill; \\define T_FREZA_CUT
+				l_type_dopTool = 'chamfer'
+			endif
+		; если тип доп.инстр. явл т-фреза сохранить информацию о доп инструменте
+			if l_type_dopTool == 't_slot'
+				if corner_radius > 0
+					if g_dopTool_value<<2>> > 0
+						l_dopTool_info = l_dopTool_info + 'Rniz' + tostr(corner_radius:'5.3(p)')
+						l_dopTool_info = l_dopTool_info + ' Rverh' + tostr(g_dopTool_value<<2>>:'5.3(p)') + ' '
+					else
+						l_dopTool_info = l_dopTool_info + 'R' + tostr(corner_radius:'5.3(p)') + ' '
+					endif
+				else
+					if g_dopTool_value<<2>> > 0
+						l_dopTool_info = l_dopTool_info + 'Rverh' + tostr(g_dopTool_value<<2>>:'5.3(p)') + ' '
+					endif
+				endif
+				if g_dopTool_value<<1>> > 0
+					if msg_mill_tool5 ne '' 
+						l_dopTool_info = l_dopTool_info + msg_mill_tool5
+					endif
+					; если в массиве значение не нулевое
+					l_dopTool_info = 'H1=' + tostr(g_dopTool_value<<1>>) + ' H2=' + tostr(g_dopTool_value<<1>> + g_cutting_tool_length)
+				else
+					; если в массиве значение нулевое ничего не делать
+				endif
+			endif
+		; если тип доп.инстр. относитс¤ к типу зенковок сохранить информацию о доп инструменте
+			if l_type_dopTool == 'chamfer'
+				if (g_dopTool_value<<(Dop_tool_number + 1)>> > 0) & (Dop_tool_number >= 0) & (Dop_tool_number <= 2)
+					; если в массиве значение не нулевое
+					l_dopTool_info = 'H.' + tostr((Dop_tool_number):'5.3(p)') + '=' + tostr(g_dopTool_value<<(Dop_tool_number + 1)>>:'5.3(p)')
+					; установить номер инструмента с учетом дополнительного инструмента
+					if Dop_tool_number ne 0
+						l_tool_number = l_tool_number + '.' + tostr((Dop_tool_number):'5.0(n)')
+						g_dop_tool_number = Dop_tool_number
+					endif
+				else
+					; если в массиве значение нулевое ничего не делать
+				endif
+			endif
+		; присоединяет префикс отдел¤ющий доп информацию от основных параметров инструмента
+			if l_dopTool_info ne ''
+				l_dopTool_info = 'dopInfo: ' + l_dopTool_info
+			endif
+	endif
+
+	; выводит коментарий инструмента
+		{nb, '* - T' l_tool_number ' '}
+		call @toolType_geometryParameters
+		{return_string}
+		if l_dopTool_info ne ''
+			; если есть дополнительна¤ информаци¤, то включить в коментарий инструмента
+			{' || ' l_dopTool_info}
+		else
+			; иначе не использовать в коментарии
+		endif
+			; добавляет любой коментарий пользователя
+		if msg_mill_tool4 ne ''
+			{nb, '; ' msg_mill_tool4}
+		endif
+	
+	; выводит строку вызова инструмента
+		if (job_type eq 'drill') & (drill_cycle_name eq 'CYCL_241')
+			{nb, 'TOOL CALL ' l_tool_number ' Z S500'}
+		else
+			{nb, 'TOOL CALL ' l_tool_number ' Z S' spin:feed_f}
+		endif
+		if not(g_mco_use)
+			{nb, 'L Z+0 R0 FMAX M91'}
+		endif
+	; включает обороты шпинделя
+		if (spin_direction == cw) & not(g_mco_use) ; вращение по часовой стрелке
+			{nb, 'M13'}
+		endif
+		if (spin_direction == ccw) & not(g_mco_use) ; вращение против часовой стрелке
+			{nb, 'M14'}
+		endif
+		if not(g_mco_use)
+			{' M341'} ; отключение скребкового конвеера
+		endif
+		
+endp
+;-------------------------
+@transform_info
+	
+	local string l_transform_name
+	; тип трансформации: зеркало
+	if transform_type == 1
+		local string l_mirror_x
+		if mirror_type == 1
+			l_mirror_x = '(mirror_x)'
+		endif
+		if mirror_type == 2
+			l_mirror_x = '(mirror_y)'
+		endif
+		if mirror_type == 3
+			l_mirror_x = '(mirror_xy)'
+		endif
+		l_transform_name = 'Mirror' + l_mirror_x
+	endif
+	; тип трансформации: вращение
+	if transform_type == 2
+		l_transform_name = 'Rotate'
+		l_transform_name = l_transform_name + '(' + tostr(angle:'+5.3(p)') + ')'
+	endif
+	; тип трансформации: клонировать
+	if transform_type == 3
+		l_transform_name = 'Translate'
+		l_transform_name = l_transform_name + '(x' + tostr(xhome:'+5.3(p)')
+		l_transform_name = l_transform_name + ';y' + tostr(yhome:'+5.3(p)')
+		l_transform_name = l_transform_name + ';z' + tostr(zhome:'+5.3(p)') + ')'
+	endif
+	; тип трансформации: 4-я ось
+	if (transform_type == 4) & (fourth_axis_last ne 1)
+		transform_4x = true
+		l_transform_name = 'Fourth_Axis'
+		l_transform_name = l_transform_name + '(' + tostr(angle:'+5.3(p)') + ')'
+	endif
+	
+	if g_transform_name ne ''
+		g_transform_name = g_transform_name + ' + '
+	endif
+	g_transform_name = g_transform_name + l_transform_name
+
+endp
+;-------------------------
+@transform_plane
+
+	; определить статус смещени¤ трансформации
+	if g_transform_plane_status == 'stop'
+		g_transform_plane_status = 'first'
+	else
+		g_transform_plane_status = 'start'
+	endif
+	; координаты смещения нулевой точки
+		g_shift_x_tr = shift_x
+		g_shift_y_tr = shift_y
+		g_shift_z_tr = shift_z
+	; значения вектора нормали к поверхности
+		g_normal_to_plane_x = normal_to_plane_x
+		g_normal_to_plane_y = normal_to_plane_y
+		g_normal_to_plane_z = normal_to_plane_z
+	
+endp
+;-------------------------
+@start_of_job
+
+	g_counter = 0
+	g_end_of_job = false
+	g_first_rapid_move = true ; - устанавливает, что следующее перемещение станка будет первым в переходе
+	g_kompensetion = 'R0' ; - установить отсутствие компенсации в начале перехода
+	
+	local logical l_drill_flag ; флаг указывающий на ипользования перехода сверления
+		l_drill_flag = false
+		if job_type eq 'drill'
+			l_drill_flag = true
+		endif
+		if job_type == 'drill_hr'
+			l_drill_flag = true
+		endif
+		if job_type == 'mw_drill_5x'
+			l_drill_flag = true
+		endif
+	
+	if job_type == 'mw_drill_5x'
+		g_xnext = 0 ; первая позиция по X 
+		g_ynext = 0 ; первая позиция по Y
+	else
+		g_xnext = xnext ; первая позиция по X 
+		g_ynext = ynext ; первая позиция по Y
+	endif
+	
+	; отключение тормозов поворотных осей
+	if otkluchenie_tormozov > 0
+		if not(g_otkluchenie_tormozov)
+			{nb, 'M11 M12'}
+		endif
+	else
+		if g_otkluchenie_tormozov
+			{nb, 'M10'}
+		endif
+	endif
+	if otkluchenie_tormozov > 0
+		g_otkluchenie_tormozov = true ; сохраняет последнее значение
+	else
+		g_otkluchenie_tormozov = false ; сохраняет последнее значение
+	endif
+
+	; определить имя смещения нулевой точки
+		call @name_home_number(mac_number, position, home_user_name) ; сохран¤ет название home_number	
+		g_home_userName = return_string ; сохрняет в глобальную переменную имя нулевой точки
+	
+	; определить имя перехода
+		local string l_job_name ; имя перехода
+		call @coment_job_name(original_job_name);return_string
+		l_job_name = return_string
+	
+	; определить является имя в текущем переходе таким же как предыдущее:
+		if (l_job_name == g_job_name) & (g_job_name ne '')
+			; если имена совпадают и переход не является первым после смены инструмента,
+			; переназначить глобальное имя переменной и установить атрибут имени true
+			g_job_name = l_job_name
+			active(g_job_name) = true
+		else
+			; если имена не совпадают или переход является первым после смены инструмента,
+			; переназначить глобальное имя переменной и установить атрибут имени false
+			g_job_name = l_job_name
+			active(g_job_name) = false
+		endif
+	
+	; COOLENT DEFINE
+		local string l_status_coolent
+		local integer l_waiting_time
+		l_waiting_time = 0
+		if g_tool_change
+			call @def_coolent_parameters ; возвращает return_string комбинацию вывода сож
+			g_status_coolent = return_string
+			l_status_coolent = g_status_coolent
+			if (job_type eq 'drill') & (drill_cycle_name eq 'CYCL_241')
+				if instr(l_status_coolent, '2') > 0
+					l_status_coolent = replace(l_status_coolent, "2", "", 0)
+				endif
+			endif
+			call @coolent_status_output(l_status_coolent, l_waiting_time)
+			g_waiting_time = Vremya_produvki_instrumenta
+		else
+			; устанавливается заново значение определенное при вызове инструмента
+			l_status_coolent = g_status_coolent
+			
+			; если используется цикл 241, отключить внутреннюю подачу сож или воздух
+			if l_drill_flag & (drill_type == 2)
+				if (g_type_cycle ne 2)
+					l_waiting_time = 2
+					l_status_coolent = '68' + l_status_coolent
+				endif
+				l_status_coolent = replace(l_status_coolent, "2", "", 0)
+				l_status_coolent = replace(l_status_coolent, "4", "", 0)
+			endif
+			
+			if (g_type_cycle == 2) or (drill_type == 2)
+				call @coolent_status_output(l_status_coolent, l_waiting_time)
+			endif
+		endif
+
+	; для 5-ти координатного перехода вся информация о смещениях и именах выводится в текущей процедуре
+	if X5_job
+		; установить последние актуальные координаты нулевой точки в глобальных переменных
+			call @setHomePosXYZAC(NULL, NULL, NULL, NULL, NULL)
+		; определить изменилась опорная точка MAC
+			call @MAC_is_change(mac_number)
+		if return_logical
+		; если MAC изменилась 
+			; не отображать данное сообщение в начале файла УП
+			if g_mac_number >= 0
+				; если изменилась опорная точки отобразить данное сообщение
+				{nb, '* !!!!!! WARNING: MAC IS CHANGE !!!!!!'}
+			endif
+			; сохранить последнюю опорную точку MAC
+			call @show_homeName ; вывести имя опорной точки
+			call @showHomePosXYZAC ; вывести опорную точку
+		endif
+		; вывести строку коментария перехода
+			call @show_jobName
+		; сохранить последнюю опорную точку MAC
+			call @set_MAC(mac_number)
+	endif
+
+endp
+;-------------------------
+@tmatrix
+	
+	; определить входит процедура в start_of_job.
+	; если нет, пропустить код текущей процедуры командой EXIT
+	if tmatrix_inside_job == 0
+		EXIT
+	endif
+	
+	; установить локальные переменные смещени¤ нулевой точки X Y Z A C
+	local numeric l_x_home l_y_home l_z_home l_a_home l_c_home
+		l_x_home = shift_x
+		l_y_home = shift_y
+		l_z_home = shift_z
+		; угол A
+			if x_angle_const_y == 0
+				l_a_home = x_angle_const_y
+			else 
+				l_a_home = (-1)*x_angle_const_y
+			endif	
+		; угол C
+			if z_angle_const_y == 0
+				l_c_home = z_angle_const_y
+			else
+				l_c_home = (-1)*z_angle_const_y
+			endif
+
+	; определяет порядок и последовательность вывода информации смещения и коментариев
+		local string l_orderOutput_data ; ключ, указывающий какие и в какой последовательности
+	; выводить команды в файл
+		l_orderOutput_data = '' ; - по умолчанию ничего не делать
+	
+		local logical l_home_is_change ; указывает изменилась нулевая точка
+	; определить изменилась нулевая точка или нет.
+		call @homePosXYZAC_is_change(l_x_home, l_y_home, l_z_home, l_a_home, l_c_home);return_logical
+		if return_logical
+			l_home_is_change = true
+		else
+			l_home_is_change = false
+		endif
+		
+	if X5_job
+		l_orderOutput_data = ''
+	else
+		; если переход не является 5-ти координатным
+		; определить изменилась опорна¤ точка MAC
+		call @MAC_is_change(mac_number)
+		if return_logical
+			l_home_is_change = true
+			; не отображать данное сообщение в начале файлф УП
+			if g_mac_number >= 0
+				; если изменилась опорна¤ точки отобразить данное сообщение
+				{nb, '* !!!!!! WARNING: MAC IS CHANGE !!!!!!'}
+			endif
+		endif
+		
+		if g_tool_change
+			; если произошла смена инструмента
+			l_orderOutput_data = '234'
+		else
+			; если смены инструмента не было
+			if g_last_job5x
+				; если предыдущий переход был X5_job
+				l_orderOutput_data = '1234'
+			else
+				; если предыдущий переход не был X5_job
+				if l_home_is_change
+					; если нулевая точка изменилась
+					l_orderOutput_data = '1234'
+				else
+					; если нулевая точка не изменилась
+					l_orderOutput_data = '4'
+				endif
+			endif
+		endif
+		; сохранить последнюю опорную точку MAC
+			call @set_MAC(mac_number)
+	endif
+	
+	; сохраняет значения смещения нулевой точки
+		call @setHomePosXYZAC(l_x_home, l_y_home, l_z_home, l_a_home, l_c_home)
+	
+	; трансформация вращение
+		if g_transform_plane_status == 'pause' & not(g_transf_eq)
+			g_transform_plane_status = 'stop'
+			if not(X5_job)
+				l_orderOutput_data = '1234'
+			endif
+		endif
+		if g_transform_plane_status ne 'stop'
+			if g_transform_plane_status eq 'first'
+				l_orderOutput_data = '24'
+			endif
+			if g_transform_name ne ''
+				l_orderOutput_data = l_orderOutput_data + '176'
+			endif
+			; определение ориентации поворотной оси A
+				if g_a_home_old >= 0
+					g_SEQ_transform = +1
+				else
+					g_SEQ_transform = -1
+				endif
+		endif
+	
+	; трансформация 4-я ось
+		if transform_4x
+			local numeric xy_radius 
+			local numeric ugol_alpha 
+			local numeric transf_4x_x transf_4x_y transf_4x_z transf_4x_a transf_4x_c
+			
+			; определение угла A и C
+				transf_4x_a = l_a_home
+				transf_4x_c = l_c_home + angle
+				if abs(transf_4x_c) == 360
+					transf_4x_c = 0
+				else
+					if abs(transf_4x_c) > 360
+						transf_4x_c = mod(transf_4x_c, 360)
+					endif
+				endif
+			; определение координат X Y Z
+				transf_4x_z = shift_z
+				if (shift_x ne 0) or (shift_y ne 0)
+					xy_radius = sqrt(pow(shift_x, 2) + pow(shift_y, 2))
+					ugol_alpha = acos(shift_x / xy_radius)
+					if shift_y < 0
+						ugol_alpha = ugol_alpha * (-1)
+					endif
+					transf_4x_x = xy_radius * cos(ugol_alpha + angle)
+					transf_4x_y = xy_radius * sin(ugol_alpha + angle)
+				else
+					transf_4x_x = shift_x
+					transf_4x_y = shift_y
+				endif
+			; сохранить смещение нулевой точки
+				call @setHomePosXYZAC(transf_4x_x, transf_4x_y, transf_4x_z, transf_4x_a, transf_4x_c)
+				l_orderOutput_data = replace(l_orderOutput_data, "1", "", 0)
+				l_orderOutput_data = replace(l_orderOutput_data, "2", "", 0)
+				l_orderOutput_data = replace(l_orderOutput_data, "3", "", 0)
+				l_orderOutput_data = l_orderOutput_data + '173'
+		endif
+	
+	; если в параметрах проекта установлено Z0_FMAX_M91 == true
+		if Z0_FMAX_M91 & not(X5_job)
+			if not((instr(l_orderOutput_data, '2') > 0) or (instr(l_orderOutput_data, '3') > 0))
+				l_orderOutput_data = '5' + l_orderOutput_data
+			endif
+		endif
+	
+	; обработчик ключа и вывод информации в порядке и содержанием заданном в ключе
+		local integer l_strlen_event ; длина строки
+			l_strlen_event = strlen(l_orderOutput_data)
+		local integer j ; счетчик считающий с начала строки
+			j = 1
+		local string l_while_event ; вычисляет номер события на каждой итерации цикла
+		while (l_strlen_event > 0) & (l_orderOutput_data ne '')
+			l_while_event = substr(l_orderOutput_data,j,1)
+			; - 1 - сброс нулевой точки
+			if l_while_event == '1'
+				call @reset_home
+			endif
+			; - 2 - коментарий нулевой точки
+			if l_while_event == '2'
+				call @show_homeName
+			endif
+			; - 3 - вызов нулевой точки
+			if l_while_event == '3'
+				call @showHomePosXYZAC
+			endif
+			; - 4 коментарий имени текущего перехода
+			if l_while_event == '4'
+				call @show_jobName
+			endif
+			; - 5 L Z+0 R0 FMAX M91
+			if l_while_event == '5'
+				{nb, 'L Z+0 R0 FMAX M91'}
+			endif
+			; - 6 вызов смещение трансформации
+			if l_while_event == '6'
+				call @show_transforme_plane
+			endif
+			; - 7 вызов коментария трансформации
+			if l_while_event == '7'
+				if g_transform_name ne ''
+					{nb, '*       -> : ' g_transform_name}
+				endif
+			endif
+			; обновление условия while
+			j = j + 1
+			l_strlen_event = l_strlen_event - 1
+		endw
+
+endp
+;-------------------------
+@drill_plane; процедура генерируетс¤ только при пятиосевом сверлении
+	
+	if rotate_plane_off == 1
+		if use_5x_move_for_5x_drill
+			call @reset_home
+			{nb, 'M128'} ; функция для включени¤ 5-ти коорд. обработки
+		endif
+		exit
+	endif
+	
+	; сброс нулевой точки и разворота
+		if use_5x_move_for_5x_drill
+			{nb, 'M129'}
+		else
+			call @reset_home
+		endif
+	; перечисление точек п¤тиосевого сверления
+		g_counter = g_counter + 1
+		{nb, '*       -> 5x_point #' g_counter:'5.0(n)'}
+	; вывод смещения нулевой точки 
+		if not(use_5x_move_for_5x_drill)
+			{nb, 'L Z+0 R0 FMAX M91'}
+		endif
+		{nb, 'CYCL DEF 7.0 SMESCHENJE NULJA'}
+		{nb, 'CYCL DEF 7.1  X' xhpos:'+5.3(p)'}
+		{nb, 'CYCL DEF 7.2  Y' yhpos:'+5.3(p)'}
+		{nb, 'CYCL DEF 7.3  Z' zhpos:'+5.3(p)'}
+		
+		local string l_value_SEQ 
+		if bpos >= 0
+			l_value_SEQ = '+'
+		else
+			l_value_SEQ = '-'
+		endif
+		{nb, 'PLANE SPATIAL SPA' bpos:'+5.3(p)' ' SPB+0 ' 'SPC' apos:'+5.3(p)'}
+		{' STAY SEQ' l_value_SEQ ' TABLE ROT'}
+		
+		if use_5x_move_for_5x_drill 
+			return
+		endif
+		
+		if FOUR_X_MOVE_ALL or FOUR_X_MOVE_ONLY_DRILL
+			{nb, 'L X+0 Y+0 A' bpos:'+5.3(p)' ' C' apos:'+5.3(p)'}
+		else
+			{nb, 'L ' 'A' bpos:'+5.3(p)' ' C' apos:'+5.3(p)'}
+		endif
+		
+		if (feed_A_C > 20000) or (feed_A_C == 0)
+			{' FMAX'}
+		else
+			{' F' (abs(feed_A_C)):feed_f}
+		endif
+		
+endp
+;-------------------------
+@m_feed_spin
+	
+	local integer l_dop_tool_number ; номер дополнительного инструмента
+	
+	; определение налчия дополнительного инструмента
+	if (job_type eq 'drill') or (job_type == 'drill_hr') or (job_type == 'mw_drill_5x')
+		call @define_dopTool_number ; возвращает return_integer
+		l_dop_tool_number = return_integer
+	else
+		l_dop_tool_number = 0
+	endif
+
+	; сравнение с предыдущим значением доп инструмента
+	if l_dop_tool_number ne g_dop_tool_number
+		; доп. инструменты не совпадают
+		if (l_dop_tool_number > 0) & (l_dop_tool_number <= 2)
+			{nb, 'TOOL CALL ' tool_number:'5.0(n)' '.' l_dop_tool_number:'5.0(n)' ' Z'}
+		else
+			{nb, 'TOOL CALL ' tool_number:'5.0(n)' ' Z'}
+		endif
+		{nb, '*    - vysota privyzki: H.' l_dop_tool_number:'5.0(n)' ' = ' (g_dopTool_value<<(l_dop_tool_number + 1)>>):'5.3(p)'}
+	else
+		if change(spin)
+			if (job_type eq 'drill') & (drill_cycle_name eq 'CYCL_241')
+				{nb, 'TOOL CALL Z S500'}
+			else
+				{nb, 'TOOL CALL Z S' spin:feed_f}
+			endif
+		endif
+	endif
+	
+	; сохранить значение доп. инструмента
+	call @save_dopTool_number(l_dop_tool_number)
+	
+endp
+;-------------------------
+@drill
+	
+	if FN_17
+		{nb, 'FN 17: SYSWRITE ID 20 NR18 =+1'}
+	endif
+	
+	g_drill_type = drill_type
+	
+	; устанавливает параметры сверления, подход¤щие дл¤ всех видов сверлени¤ и 5-ти осевого
+		call @set_drill_parameters
+		if (job_type == 'mw_drill_5x') & use_5x_move_for_5x_drill
+			g_clearance_plane_Q204 = g_safety_Q200
+		endif
+	
+	local numeric l_step_Q202 ; глубина врезания
+	
+	; CYCL DEF 200 SWERLENIJE
+	if g_drill_type == 0
+		if down_step > 0
+			l_step_Q202 = down_step
+		else
+			l_step_Q202 = g_depth_Q201
+		endif
+		{nb, 'CYCL DEF 200 SWERLENIJE ~'}
+		{nl, '	Q200='  g_safety_Q200:'+5.3(p)'   '	;RASSTO. BEZOPASNOSTI ~'}
+		{nl, '	Q201=' (g_depth_Q201 * (-1)):'+5.3(p)'   '	;GLUBINA ~'}
+		{nl, '	Q206=' feed:'+5.0(p)'  '	;PODACHA NA WREZANJE ~'}
+		{nl, '	Q202=' l_step_Q202:'+5.3(p)'     '	;GLUBINA WREZANJA ~'}
+		{nl, '	Q210=+0    ;WYDER. WREMENI WWER. ~'}
+		{nl, '	Q203='  g_surface_Q203:'+5.3(p)'  '	;SURFACE COORDINATE ~'}
+		{nl, '	Q204=' g_clearance_plane_Q204:'+5.3(p)'   '	;2-JE BEZOP.RASSTOJ. ~'}
+		{nl, '	Q211=+0    ;WYDER.WREMENI WNIZU'}
+	endif
+	
+	; CYCL DEF 205 UNIW. GL. SWERLENIE
+	if g_drill_type == 1
+		if down_step > 0
+			l_step_Q202 = down_step
+		else
+			l_step_Q202 = g_depth_Q201
+		endif
+		{nb 'CYCL DEF 205 UNIW. GL. SWERLENIE ~'}
+		{nl, '	Q200=' g_safety_Q200:'+5.3(p)'  '	;RASSTO. BEZOPASNOSTI ~'}
+		{nl, '	Q201=' (g_depth_Q201 * (-1)):'+5.3(p)'   '	;GLUBINA ~'}
+		{nl, '	Q206=' feed:'+5.0(p)'  '	;PODACHA NA WREZANJE ~'}
+		{nl, '	Q202=' l_step_Q202:'+5.3(p)'   '	;GLUBINA WREZANJA ~'}
+		{nl, '	Q203='  g_surface_Q203:'+5.3(p)'  '	;SURFACE COORDINATE ~'}
+		{nl, '	Q204=' g_clearance_plane_Q204:'+5.3(p)'   '	;2-JE BEZOP.RASSTOJ. ~'}
+		{nl, '	Q212=+0    ;SJOM MATERIALA ~'}
+		{nl, '	Q205=+0    ;MIN.GLUBINA WREZANJA ~'}
+		{nl, '	Q258=+0.3  ;RASST.BEZ. WWERCHU ~'}
+		{nl, '	Q259=+0.3  ;RASST.BEZ. W NIZU ~'}
+		{nl, '	Q257='	Glubina_sverl_pri_lom_str_Q257:'+5.3(p)'	 '	;GL.SWERL.PRI LOMANII ~'}
+		{nl, '	Q256=0.2	;WYCHOD PRI LOMANII ~'}
+		{nl, '	Q211=+0    ;WYDER.WREMENI WNIZU ~'}
+		{nl, '	Q379=' tochka_starta_Q379:'+5.3(p)'	   '	;TOCHKA STARTA ~'}
+		if podacha_pred_poz_Q253 ne 0
+			{nl, '	Q253='  podacha_pred_poz_Q253:'+5.0(p)'   '	;PODACHA PRED.POZIC.'}
+		else
+			{nl, '	Q253=+750	;PODACHA PRED.POZIC.'}
+		endif
+	endif
+	
+	; CYCL DEF 241 SINGLE-LIP D.H.DRLNG
+	if g_drill_type == 2
+		{nb 'CYCL DEF 241 SINGLE-LIP D.H.DRLNG ~'}
+		{nl, '	Q200=' g_safety_Q200:'+5.3(p)'  '	;RASSTO. BEZOPASNOSTI ~'}
+		{nl, '	Q201=' (g_depth_Q201 * (-1)):'+5.3(p)'   '	;GLUBINA ~'}
+		{nl, '	Q206=' feed:'+5.0(p)'  '	;PODACHA NA WREZANJE ~'}
+		{nl, '	Q211=+0    ;WYDER.WREMENI WNIZU ~'}
+		{nl, '	Q203='  g_surface_Q203:'+5.3(p)'  '	;SURFACE COORDINATE ~'}
+		{nl, '	Q204=' g_clearance_plane_Q204:'+5.3(p)'   '	;2-JE BEZOP.RASSTOJ. ~'}
+		{nl, '	Q379=' tochka_starta_Q379:'+5.3(p)'	   '	;TOCHKA STARTA ~'}
+		if podacha_pred_poz_Q253 ne 0
+			{nl, '	Q253='  podacha_pred_poz_Q253:'+5.0(p)'   '	;PODACHA PRED.POZIC. ~'}
+		else
+			{nl, '	Q253=+1000	;PODACHA PRED.POZIC. ~'}
+		endif
+		{nl, '	Q208=+1500 ;PODACHA WYCHODA ~'}
+		{nl, '	Q426=+3    ;DIR. OF SPINDLE ROT. ~'}
+		{nl, '	Q427=+500' ' ;ROT.SPEED INFEED/OUT ~'}
+		{nl, '	Q428=' spin:'+5.0(p)'  ' ;ROT. SPEED DRILLING ~'}
+		{nl, '	Q429=+49    ;COOLANT ON ~'}
+		{nl, '	Q430=+50    ;COOLANT OFF ~'}
+		{nl, '	Q435=+0    ;DWELL DEPTH'}
+	endif
+	
+	;CYCL DEF 201 RAZWIORTYWANIE
+	if g_drill_type == 3
+		{nb, 'CYCL DEF 201 RAZWIORTYWANIE ~'}
+		{nl, '    Q200=' g_safety_Q200:'+5.3(p)'  ';RASSTO. BEZOPASNOSTI ~'}
+		{nl, '    Q201=' (g_depth_Q201 * (-1)):'+5.3(p)'   ';GLUBINA ~'}
+		{nl, '    Q206=' feed:'+5.0(p)'  	';PODACHA NA WREZANJE ~'}
+		{nl, '    Q211='	Vremya_vyderzhki_Q211:'+5.2(p)'  	';WYDER.WREMENI WNIZU ~'}
+		if Podacha_obr_hoda_Q208 > 0
+			{nl, '    Q208='	Podacha_obr_hoda_Q208 	';PODACHA WYCHODA ~'}
+		else
+			{nl, '    Q208=' feed:'+5.0(p)' '	;PODACHA WYCHODA ~'}
+		endif
+		{nl, '    Q203='  g_surface_Q203:'+5.3(p)'  ';SURFACE COORDINATE ~'}
+		{nl, '    Q204=' g_clearance_plane_Q204:'+5.3(p)'   ';2-JE BEZOP.RASSTOJ'}
+	endif
+	
+	;CYCL DEF 202 RASTOCHKA
+	if g_drill_type == 4
+		{nb, 'CYCL DEF 202 RASTOCHKA ~'}
+		{nl, '	Q200=' g_safety_Q200:'+5.3(p)'  '	;RASSTO. BEZOPASNOSTI ~'}
+		{nl, '	Q201=' (g_depth_Q201 * (-1)):'+5.3(p)'   '	;GLUBINA ~'}
+		{nl, '	Q206=' feed:'+5.0(p)'  	'	;PODACHA NA WREZANJE ~'}
+		{nl, '	Q211=+0    ;WYDER.WREMENI WNIZU ~'}
+		{nl, '	Q208=6000	;PODACHA WYCHODA ~'}
+		{nl, '	Q203='  g_surface_Q203:'+5.3(p)'  '	;SURFACE COORDINATE ~'}
+		{nl, '	Q204=' g_clearance_plane_Q204:'+5.3(p)'   '	;2-JE BEZOP.RASSTOJ. ~'}
+		{nl, '	Q214=+4    ;NAPR.WYCHODA IZ MAT ~'}
+		{nl, '	Q336=+0    ;UGOL SCHPINDEL'}
+	endif
+	
+	;CYCL DEF 208 BORE MILLING
+	if g_drill_type == 5
+		if down_step > 0
+			l_step_Q202 = down_step
+		else
+			l_step_Q202 = 0
+		endif
+		{nb, 'CYCL DEF 208 BORE MILLING ~'}
+		{nl, '	Q200=' g_safety_Q200:'+5.3(p)'  '	;RASSTO. BEZOPASNOSTI ~'}
+		{nl, '	Q201=' (g_depth_Q201 * (-1)):'+5.3(p)'   '	;GLUBINA ~'}
+		{nl, '	Q206=' feed:'+5.0(p)'  	'	;PODACHA NA WREZANJE ~'}
+		{nl, '	Q334='	 l_step_Q202:'+5.3(p)'	'	;GLUBINA WREZANJA ~'}
+		{nl, '	Q203='  g_surface_Q203:'+5.3(p)'  '	;SURFACE COORDINATE ~'}
+		{nl, '	Q204=' g_clearance_plane_Q204:'+5.3(p)'   '	;2-JE BEZOP.RASSTOJ. ~'}
+		{nl, '	Q335='	 (abs(Zadannyi_diametr)):'+5.3(p)' 	'	;NOMINALNYJ DIAMETR ~'}
+		{nl, '	Q342='	 (abs(Diametr_chern_sverl)):'+5.3(p)'	'	;DIAM. CHER.SWERLENIA ~'}
+		{nl, '	Q351=+1    ;WID FREZEROWANIA'}
+	endif
+	
+	;CYCL DEF 207 NAREZANIE REZBI GS
+	if g_drill_type == 6
+		{nb, 'CYCL DEF 207 NAREZANIE REZBI GS ~'}
+		{nl, '	Q200=' g_safety_Q200:'+5.3(p)'  '	;RASSTO. BEZOPASNOSTI ~'}
+		{nl, '	Q201=' (g_depth_Q201 * (-1)):'+5.3(p)'   '	;GLUBINA ~'}
+		{nl, '	Q239='	 tool_drill_lead:'+5.3(p)'	'	;SCHAG REZBY ~'}
+		{nl, '	Q203='  g_surface_Q203:'+5.3(p)'  '	;SURFACE COORDINATE ~'}
+		{nl, '	Q204=' g_clearance_plane_Q204:'+5.3(p)'   '	;2-JE BEZOP.RASSTOJ.'}
+	endif
+	
+	;CYCL DEF 262 REZBOFREZEROWANIE
+	if g_drill_type == 7
+		{nb, 'CYCL DEF 262 REZBOFREZEROWANIE ~'}
+		{nl, '	Q335='	 (abs(Zadannyi_diametr)):'+5.3(p)' 	'	;NOMINALNYJ DIAMETR ~'}
+		{nl, '	Q239='	 tool_drill_lead:'+5.3(p)'	'	;SCHAG REZBY ~'}
+		{nl, '	Q201=' (g_depth_Q201 * (-1)):'+5.3(p)'   '	;GLUBINA ~'}
+		{nl, '	Q355='	 tool_thread_teeth_number:'+5.0(p)'	';DOBOWLENJE ~'}
+		{nl, '	Q253=+750	;PODACHA PRED.POZIC ~'}
+		{nl, '	Q351=+1    ;WID FREZEROWANIA ~'}
+		{nl, '	Q200=' g_safety_Q200:'+5.3(p)'  '	;RASSTO. BEZOPASNOSTI ~'}
+		{nl, '	Q203='  g_surface_Q203:'+5.3(p)'  '	;SURFACE COORDINATE ~'}
+		{nl, '	Q204=' g_clearance_plane_Q204:'+5.3(p)'   '	;2-JE BEZOP.RASSTOJ ~'}
+		{nl, '	Q207='	 feed:'+5.0(p)'	'	;FEED RATE FOR MILLNG.'}
+	endif
+	
+	;CYCL DEF 265 FREZ.OTWIER.PO HEL
+	if g_drill_type == 8
+		{nb, 'CYCL DEF 265 FREZ.OTWIER.PO HEL. ~'}
+		{nl, '	Q335='	 (abs(Zadannyi_diametr)):'+5.3(p)' 	'	;NOMINALNYJ DIAMETR ~'}
+		{nl, '	Q239='	 tool_drill_lead:'+5.3(p)'	'	;SCHAG REZBY ~'}
+		{nl, '	Q201=' (g_depth_Q201 * (-1)):'+5.3(p)'   '	;GLUBINA ~'}
+		{nl, '	Q253=+750	;PODACHA PRED.POZIC. ~'}
+		{nl, '	Q358=+0    ;GLUB.TORCOW. STORO. ~'}
+		{nl, '	Q359=+0    ;SDWIG TOREC ~'}
+		{nl, '	Q360=+0    ;ZENKEROWANIE ~'}
+		{nl, '	Q200=' g_safety_Q200:'+5.3(p)'  '	;RASSTO. BEZOPASNOSTI ~'}
+		{nl, '	Q203='  g_surface_Q203:'+5.3(p)'  '	;SURFACE COORDINATE ~'}
+		{nl, '	Q204=' g_clearance_plane_Q204:'+5.3(p)'   '	;2-JE BEZOP.RASSTOJ. ~'}
+		{nl, '	Q254=+200  ;PODACHA ZENKER. ~'}
+		{nl, '	Q207='	 feed:'+5.0(p)'	'	;FEED RATE FOR MILLNG'}
+	endif
+	
+	;CYCL DEF 267 ФР. внешней резьбы
+	if g_drill_type eq 13
+		{nb, 'CYCL DEF 267 фр. внешней резьбы'}
+		{nl, '	Q335='	 (abs(Zadannyi_diametr)):'+5.3(p)' 	'	;NOMINALNYJ DIAMETR ~'}
+		{nl, '	Q239='	 tool_drill_lead:'+5.3(p)'	'	;SCHAG REZBY ~'}
+		{nl, '	Q201=' (g_depth_Q201 * (-1)):'+5.3(p)'   '	;GLUBINA ~'}
+		{nl, '	Q355=1 ;DOBOWLENJE ~'}
+		{nl, '	Q253=+750 ;PODACHA PRED.POZIC. ~'}
+		{nl, '	Q351=+1 ;WID FREZEROWANIA ~'}
+		{nl, '	Q200=' g_safety_Q200:'+5.3(p)'  '	;RASSTO. BEZOPASNOSTI ~'}
+		{nl, '	Q358=+0 ;GLUB.TORCOW. STORO. ~'}
+		{nl, '	Q359=+0 ;SDWIG TOREC ~'}
+		{nl, '	Q203='  g_surface_Q203:'+5.3(p)'  '	;SURFACE COORDINATE ~'}
+		{nl, '	Q204=' g_clearance_plane_Q204:'+5.3(p)'   '	;2-JE BEZOP.RASSTOJ. ~'}
+		{nl, '	Q254=+200 ;PODACHA ZENKER. ~'}
+		{nl, '	Q207='	 feed:'+5.0(p)'	'	;FEED RATE FOR MILLNG'}
+	endif
+	
+	;CYCL DEF 252 KRUGOWOJ KARMAN
+	if g_drill_type == 9
+		if down_step > 0
+			l_step_Q202 = down_step
+		else
+			l_step_Q202 = g_depth_Q201
+		endif
+		{nb, 'CYCL DEF 252 KRUGOWOJ KARMAN ~'}
+		{nl, '	Q215=+0    ;OBRABOTKA ~'}
+		{nl, '	Q223=' (abs(Zadannyi_diametr)):'+5.3(p)'  '   ;DIAMETR OKRUSHNOSTI ~'}
+		{nl, '	Q368=' pripusk_na_storonu_Q368:'+5.3(p)' '    ;ALLOWANCE FOR SIDE ~'}
+		{nl, '	Q207=' feed:'+5.0(p)' '  ;FEED RATE FOR MILLNG ~'}
+		{nl, '	Q351=+1    ;WID FREZEROWANIA ~'}
+		{nl, '	Q201=' (g_depth_Q201 * (-1)):'+5.3(p)' '   ;GLUBINA ~'}
+		{nl, '	Q202=' l_step_Q202:'+5.3(p)'   '	;GLUBINA WREZANJA ~'}
+		{nl, '	Q369=' pripusk_na_glubinu_Q369:'+5.3(p)' '    ;ALLOWANCE FOR FLOOR ~'}
+		{nl, '	Q206=' feed:'+5.0(p)' '  ;PODACHA NA WREZANJE ~'}
+		{nl, '	Q338=+0    ;WREZ. CHISTOW.OBR. ~'}
+		{nl, '	Q200=' g_safety_Q200:'+5.3(p)' '    ;RASSTO. BEZOPASNOSTI ~'}
+		{nl, '	Q203=' g_surface_Q203:'+5.3(p)' '    ;SURFACE COORDINATE ~'}
+		{nl, '	Q204=' g_clearance_plane_Q204:'+5.3(p)' '   ;2-JE BEZOP.RASSTOJ. ~'}
+		if (tool_path_overlap < 2) & (tool_path_overlap > 0)
+			{nl, '	Q370=' tool_path_overlap:'+5.3(p)' '    ;TOOL PATH OVERLAP ~'}
+		else
+			{nl, '	Q370=+1    ;TOOL PATH OVERLAP ~'}
+		endif
+		if vrezanie_po_spirali_Q366
+			{nl, '	Q366=+1    ;PLUNGE ~'}
+		else
+			{nl, '	Q366=+0    ;PLUNGE ~'}
+		endif
+		{nl, '	Q385=' (feed * 0.7):'+5.0(p)' '  ;FINISHING FEED RATE'}
+	endif
+
+endp
+;-------------------------
+@drill_point
+
+	; координаты точек сверления
+	if job_type eq 'mw_drill_5x'
+		g_xpos = 0 
+		g_ypos = 0
+	else
+		g_xpos = xpos 
+		g_ypos = ypos
+	endif
+	
+	; 214 g_drill_type == 10 ; 215 g_drill_type == 11
+	if (g_drill_type == 10) or (g_drill_type == 11)
+		g_counter = g_counter + 1
+		{nb, ';      -> point# ' g_counter:'5.0(n)'}
+		; проверка корректности входящих параметров и определение типа цикла 214
+		local integer num_types_cycle214_215
+		num_types_cycle214_215 = 0
+		; определетиь, что в переходе не используетс¤ больше одного параметра или ни одного
+			if use_t_boring & (g_drill_type == 10)
+				num_types_cycle214_215 = num_types_cycle214_215 + 1
+			endif
+			if if_t_faska_use
+				num_types_cycle214_215 = num_types_cycle214_215 + 1
+			endif
+			if start_from_center
+				num_types_cycle214_215 = num_types_cycle214_215 + 1
+			endif
+			if double_chamfer
+				num_types_cycle214_215 = num_types_cycle214_215 + 1
+			endif
+		if num_types_cycle214_215 > 1
+			{nb, '* !!!! CHECK THE PARAMETERS IN THE TRANSITION SolidCAM'}
+			{nb, '; Only one or none of the parameters can be TRUE :'}
+			if g_drill_type == 10
+				{nb, '* => use_t_boring: ' use_t_boring}
+			endif
+			{nb, '* => if_t_faska_use: ' if_t_faska_use}
+			{nb, '* => start_from_center: ' start_from_center}
+			{nb, '* => double_chamfer: ' double_chamfer}
+			{nb, 'STOP M5'}
+			exit
+		endif
+		local string l_type_cycle214_215
+		l_type_cycle214_215 = 'other_mill'
+		; определить к какому типу инструмента относить цикл
+			if tool_type == slot_mill
+				l_type_cycle214_215 = 'slot_mill'
+			endif
+			if tool_type == taper_mill
+				l_type_cycle214_215 = 'chamfer_mill'
+			endif
+			if tool_type == spot_drill
+				l_type_cycle214_215 = 'chamfer_mill'
+			endif
+			if tool_type == chamfer_drill
+				l_type_cycle214_215 = 'chamfer_mill'
+			endif
+			if tool_type == dove_mill
+				l_type_cycle214_215 = 'chamfer_mill'
+			endif
+		; определить какой тип цикла выводить при определЄнном типе инструмента
+			if l_type_cycle214_215 == 'slot_mill'
+				if use_t_boring & (g_drill_type == 10)
+					call @Slot_use_cycle208_214
+				endif
+				if if_t_faska_use
+					call @Slot_chamfer_214
+				endif
+				if start_from_center
+					call @Slot_from_centr_214
+				endif
+				if double_chamfer
+					call @Slot_double_chamfer_214
+				endif
+				if num_types_cycle214_215 == 0
+					call @classic_slot_214
+				endif
+			endif
+			if l_type_cycle214_215 == 'chamfer_mill'
+				call @Chamfer_mill_214
+			endif
+			if l_type_cycle214_215 == 'other_mill'
+				call @Other_mill_214
+			endif
+	endif
+	
+	; T-RADIUS
+	if g_drill_type == 12
+		; проверка корректности входных данных для цикла
+		call @control_correctly_parameters_tRadius ; true - данные корректны
+		if not(return_logical)
+			{nb, 'STOP M5'}
+			return
+		endif
+		g_counter = g_counter + 1
+		{nb, ';      -> point# ' g_counter:'5.0(n)'}
+		if not(Use_verhn_kanavka)
+			call @t_radius_cylynder
+		endif
+			call @t_radius_aproach_skrugl
+		if Use_verhn_kanavka
+			call @t_radius_skrugl_verh
+		else
+			call @t_radius_skrugl_niz
+		endif
+		if Use_verhn_kanavka
+			call @t_radius_cylynder
+		endif
+	endif
+	
+	if not((g_drill_type == 10) or (g_drill_type == 11) or (g_drill_type == 12))
+		{nb, 'L' ' X' g_xpos ' Y' g_ypos ' R0 FMAX M99'}
+	endif
+	
+	if FN_17
+		{nb, 'FN 17: SYSWRITE ID 20 NR18 =+0'}
+	endif
+	
+endp
+;-------------------------
+@rapid_move
+	
+	if (job_type eq 'drill_hr') or (job_type eq 'drill')
+		exit
+	endif
+	if g_end_of_job
+		exit
+	endif
+	
+	;{nb, 'ACTIVE(COMPENSETION): ' g_kompensetion ' => ATRIBUT: ' (active(g_kompensetion))}
+	if g_first_rapid_move
+		; если перемещение является первым в переходе
+		{nb, 'L X' xpos ' Y' ypos}
+		{' ' g_kompensetion ' FMAX'}
+		{nb, 'L Z' zpos ' FMAX'}
+		g_first_rapid_move = false
+	else
+		; если перемещение не является первым в переходе
+		{nb, 'L X' xpos ' Y' ypos ' Z' zpos}
+		; вставить компенсацию если та изменилась , после предыдущего перемещения
+		if active(g_kompensetion)
+			{' ' g_kompensetion}
+		endif
+		{' FMAX'}
+	endif
+	
+	active(g_kompensetion) = false
+	
+endp
+;-------------------------
+@line
+	
+	{nb, 'L' ' X' xpos ' Y' ypos [' Z' zpos]}
+	; вставить компенсацию если та изменилась , после предыдущего перемещения 
+	if active(g_kompensetion)
+		{' ' g_kompensetion}
+	endif
+	{[' F' feed]}
+	
+	active(g_kompensetion) = false
+
+endp
+;-------------------------
+@arc
+	
+	; определить центр дуги
+	if change(xcenter) or change(ycenter)
+		{nb, 'CC X' xcenter:'+5.3(p)' ' Y' ycenter:'+5.3(p)'}
+	endif
+	
+	; определить в каком напрвлении будет следовать дуга по/против часовой стрелке
+	if arc_direction
+		g_arc_direction = 'DR+'
+	else
+		g_arc_direction = 'DR-'
+	endif
+	
+	; определить, какое перемещение будет. по спирали с изменением по Z либо двухмерная дуга, только по X Y
+	if change(zpos)
+		; если координаиа Z изменилась применяется спиральная обработка
+		local numeric arc_size_change
+		if not(arc_direction)
+			arc_size_change = arc_size*(-1)
+		else
+			arc_size_change = arc_size
+		endif
+		{nb, 'CP IPA' arc_size_change:'+5.3(p)' ' Z' zpos ' ' g_arc_direction}
+	else
+		; если координаиа Z не изменилась применяется перемещение по дуге
+		{nb, 'C'  ' X' xpos ' Y' ypos ' ' g_arc_direction}
+	endif
+	; вставить компенсацию если та изменилась , после предыдущего перемещения
+	if active(g_kompensetion)
+		{' ' g_kompensetion}
+	endif
+	
+	{[' F' feed]} ; подача добавляется если она изменилась
+	active(g_kompensetion) = false ; сброс атрибута компенсации
+endp
+;-------------------------
+@compensation
+
+	local string l_compensetion; - промежуточная переменная для сравнения
+	
+	if side eq comp_left
+		l_compensetion = 'RL'
+	else
+		if side eq comp_right
+			l_compensetion = 'RR'
+		else
+			l_compensetion = 'R0'
+		endif
+	endif
+	
+	; определяет и схраняет тип коррекции. Устанавливает атрибут переменной коррекции
+	if g_kompensetion ne l_compensetion
+	; если коррекция инструмента изменилась установить атрибут false
+		g_kompensetion = l_compensetion
+		active(g_kompensetion) = true
+	else
+	; если коррекция инструмента не изменилась установить атрибут false
+		active(g_kompensetion) = false
+	endif
+	
+endp
+;-------------------------
+@tool_path_info
+	
+	; коментарии к типу перемещени¤ инструмента
+	if tool_path_type == 'end_approach'
+		;{nb, '; feed move'}
+	endif
+	if tool_path_type == 'start_retreat'
+		;{nb, '; rapid move'}
+	endif
+endp
+;-------------------------
+@move_5x
+	
+	if (job_type == 'mw_drill_5x') & not(use_5x_move_for_5x_drill)
+		return
+	endif
+	
+	; расчет угла — для перемещений
+	local numeric c_axis_pos
+	if abs(apos) > 360
+		c_axis_pos = mod (apos, 360)
+	else
+		c_axis_pos = apos
+	endif
+	
+	; если позиция является первой в переходе, произвести подвод к точке старта 
+	; и переместить инструмент над первый точкой
+	if g_first_rapid_move
+		if not(g_tool_change)
+			if (job_type == 'mw_drill_5x') & use_5x_move_for_5x_drill
+				{nb, 'L Z+0 R0 FMAX M91'}
+			endif
+			call @reset_home
+		endif
+			{nb, '; start approach 5-axis'}
+			{nb, 'M129'}
+		; вывести в файл смещение нулевой точки 
+			{nb, 'L Z+0 R0 FMAX M91'}
+			{nb, 'CYCL DEF 7.0 SMESCHENJE NULJA'}
+			{nb, 'CYCL DEF 7.1  X' xpos:'+5.3(p)'}
+			{nb, 'CYCL DEF 7.2  Y' ypos:'+5.3(p)'}
+			{nb, 'CYCL DEF 7.3  Z' zpos:'+5.3(p)'}
+			local string l_value_SEQ 
+			if bpos >= 0
+				l_value_SEQ = '+'
+			else
+				l_value_SEQ = '-'
+			endif
+			{nb, 'PLANE SPATIAL SPA' bpos:'+5.3(p)' ' SPB+0 ' 'SPC' c_axis_pos:'+5.3(p)'}
+			{' STAY SEQ' l_value_SEQ ' TABLE ROT'}
+			{nb, 'L X+0 Y+0 A' bpos:'+5.3(p)' ' C' c_axis_pos:'+5.3(p)'}
+
+			if (feed_A_C > 20000) or (feed_A_C == 0)
+				{' FMAX'}
+			else
+				{' F' (abs(feed_A_C)):feed_f}
+			endif
+		; сбросить нулевую точку
+			call @reset_home
+			g_first_rapid_move = false ; отключает последующий вход дл¤ первого подхода
+			{nb, '; move 5_x'}
+			{nb, 'M128'} ; функция для включения 5-ти коорд. обработки
+	endif
+	
+	; точки перемещени¤ при 5-ти осевой обработке
+		{nb, 'L ' [' X' xpos:'+5.3(p)'] [' Y' ypos:'+5.3(p)']}
+		{[' Z' zpos:'+5.3(p)'] [' A' bpos:'+5.3(p)']}
+		if change(apos)
+			{' C' c_axis_pos:'+5.3(p)'}
+		endif
+		{' FMAX'}
+
+endp
+;-------------------------
+@line_5x
+	
+	; расчет угла — дл¤ перемещений
+	local numeric c_axis_pos
+	if abs(apos) > 360
+		c_axis_pos = mod (apos, 360)
+	else
+		c_axis_pos = apos
+	endif
+	
+	{nb, 'L ' [' X' xpos:'+5.3(p)'] [' Y' ypos:'+5.3(p)']  [' Z' zpos:'+5.3(p)']} 
+	{[' A' bpos:'+5.3(p)']}
+	if change(apos)
+		{' C' c_axis_pos:'+5.3(p)'}
+	endif
+	{[' F' feed]}
+
+endp
+;-------------------------
+@end_of_job
+	
+	; сброс имени после каждого перехода
+		g_transform_name = ''
+	
+	g_end_of_job = true ; конец перехода 
+	
+	; отключения синхрогизации при пятиосевом фрезеровании
+		if X5_job
+			{nb, 'M129'}
+		endif
+	; отладочный режим программы
+		if DEBUGGING
+			{nb, '/STOP; debugging the program'}
+		endif
+
+	; ѕеременные сохран¤ющие параметры последнего используемого перехода
+		g_last_job5x = X5_job ; сохранение состо¤ни¤ X5_job
+		g_tool_change = false ; сброс смены инструмента
+
+	; устанавливает статус трансформации после каждого перехода
+		if g_transform_plane_status ne 'stop'
+			g_transform_plane_status = 'pause'
+		endif
+	
+	; сохраняет тип цикла сверления
+	if (job_type eq 'drill') or (job_type == 'drill_hr') or (job_type == 'mw_drill_5x')
+		g_type_cycle = g_drill_type
+	else
+		g_type_cycle = -1
+	endif
+	; трансформация 4-я ось отключается
+		transform_4x = false
+endp
+;-------------------------
+@end_program
+	
+	; для LBL 
+	g_mac_number = -1
+	
+	if MCO_Option_Name ne 'mco_end_programm' 
+		; отключение тормозов в конце программы
+		if g_otkluchenie_tormozov
+			{nb, 'M10'}
+		endif
+		; отключение сож 
+		call @stop_coolent(g_status_coolent)
+			
+		call @reset_home
+		
+		if g_polomka_use
+			{nb, 'CALL LBL "POLOMKA" ; tool break control' }
+			{nb, 'TOOL CALL Q65 Z ; define blocking tool'}
+		endif
+	endif
+	
+	if USE_LBL or g_polomka_LBL
+		{nb, 'CALL LBL "END_PROGRAMM"' }
+		{nb, '*======= LBL ======='}
+		if g_polomka_LBL
+			{nb, '* - LBL POLOMKA'}
+			{nb, 'LBL "POLOMKA"'}
+			{nb, 'FN 18: SYSREAD Q65 = ID20 NR1'}
+			{nb, 'TCH PROBE 586 TOOL BREAKAGE DETECT ~'}
+			{nl, '	Q356=+1    ;MEAS. DIRECTION ~'}
+			{nl, '	Q357=+0    ;RADIAL OFFSET ~'}
+			{nl, '	Q359=+0    ;ADD. LENGTH CORRECT. ~'}
+			{nl, '	Q375=+0    ;APPROACH STRATEGY ~'}
+			{nl, '	Q376=+200  ;SAFETY DISTANCE'}
+			{nb, 'LBL 0'}
+		endif
+		if USE_LBL
+			{nb, '* - LBL SBROS'}
+			{nb, 'LBL "SBROS"'}
+			{nb, 'L Z+0 R0 FMAX M91'}
+			{nb, 'CYCL DEF 7.0 SMESCHENJE NULJA'}
+			{nb, 'CYCL DEF 7.1  X+0'}
+			{nb, 'CYCL DEF 7.2  Y+0'}
+			{nb, 'CYCL DEF 7.3  Z+0'}
+			{nb, 'PLANE RESET STAY'}
+			{nb, 'LBL 0'}
+		endif
+		
+	endif
+	
+endp
+;-------------------------
+@home_data
+	
+	if USE_LBL
+		call @name_home_number(mac_number, position, home_user_name)
+		{nb, '* - LBL ' return_string}
+		{nb, 'LBL "' g_mac_part_home '"'}
+			
+		; установить локальные переменные смещени¤ нулевой точки X Y Z A C
+			local numeric l_a_home l_c_home
+		; угол A
+			if x_angle_const_y == 0
+				l_a_home = x_angle_const_y
+			else 
+				l_a_home = (-1)*x_angle_const_y
+			endif	
+		; угол C
+			if z_angle_const_y == 0
+				l_c_home = z_angle_const_y
+			else
+				l_c_home = (-1)*z_angle_const_y
+			endif
+			
+		;вывести в файл уп виртуального смещения X Y Z и поворота стола A C
+			{nb, 'L Z+0 R0 FMAX M91'}
+			{nb, 'CYCL DEF 7.0 SMESCHENJE NULJA'}
+			{nb, 'CYCL DEF 7.1  X' shift_x:'+5.3(p)'}
+			{nb, 'CYCL DEF 7.2  Y' shift_y:'+5.3(p)'}
+			{nb, 'CYCL DEF 7.3  Z' shift_z:'+5.3(p)'}
+		;ќпределить знака угла разворота по оси A
+			local string l_value_SEQ 
+			if l_a_home >= 0
+				l_value_SEQ = '+'
+			else
+				l_value_SEQ = '-'
+			endif
+		; виртуальный разворот системы координат
+			{nb, 'PLANE SPATIAL SPA' l_a_home:'+5.3(p)' ' SPB+0 ' 'SPC' l_c_home:'+5.3(p)'}
+			{' STAY SEQ' l_value_SEQ ' TABLE ROT'}
+		;физический разворот стола станка
+			{nb, 'L ' 'A' l_a_home:'+5.3(p)' ' C' l_c_home:'+5.3(p)'}
+			if (feed_A_C > 20000) or (feed_A_C == 0)
+				{' FMAX'}
+			else
+				{' F' (abs(feed_A_C)):feed_f}
+			endif
+		{nb, 'LBL 0'}
+	endif
+	
+endp
+;-------------------------
+@end_of_file
+	
+	if USE_LBL or g_polomka_LBL
+		{nb, 'LBL "END_PROGRAMM"'}
+	endif
+	{nb, 'END PGM ' g_file_name ' MM'}
+	
+endp
+;-------------------------
+@dwell
+	if dwell_time > 0 
+		{nb, 'CYCL DEF 9.0 WYDERSHKA WREMENI'}
+		{nb, 'CYCL DEF 9.1 WYD.WR' dwell_time:'5.0(n)'}
+	endif
+endp
+;-------------------------
+@machine_stop
+
+	if machine_stop eq 1
+		{nb, 'M2'}
+	endif
+	
+endp
+;-------------------------
+@machine_opt_stop
+	
+	if optional_stop eq 1 
+		{nb, 'STOP'}
+	endif
+	
+endp
+;-------------------------
+@chip_convery
+	
+	if chip_convey eq 1 
+		{nb, 'M340 ; conveyor on'}
+	else
+		{nb, 'M341 ; conveyor off'}
+	endif
+	
+endp
+;-------------------------
+@cool_flood
+	
+	if flood_coolant eq 1 
+		if DeviceIdNum == 1
+			{nb, 'M46 ; podacha sozh na instrument'}
+		endif
+		if DeviceIdNum == 0
+			{nb, 'M47 ; coolent machine kabinet'}
+		endif
+	endif
+	
+endp
+;-------------------------
+@mco_message
+	
+	if message ne '' 
+		{nb, '*' message}
+	endif
+	
+endp
+;-------------------------
+@tool_msr
+	
+	local integer msr_flag
+	if msr_len 
+		if msr_rad
+			msr_flag = 0
+		else
+			msr_flag = 1
+		endif
+	else
+		if msr_rad
+			msr_flag = 2
+		endif
+	endif
+	
+	{nb, '  TCH PROBE 584 TOOL SETTING L,R ~'}
+	{nl, '    Q350=+0    ;MEASURING TYPE ~'}
+	{nl, '    Q351=' msr_flag:'+5.0(n)' '    ;APPLICATION ~'}
+	{nl, '    Q352=+0    ;CUTTING EDGE CONTROL ~'}
+	{nl, '    Q355=-1    ;MEASURING POSITION ~'}
+	{nl, '    Q361=+3    ;NUMBER OF MEASURINGS ~'}
+	{nl, '    Q362=+0.02 ;SCATTER TOLERANCE ~'}
+	{nl, '    Q359=+0    ;ADD. LENGTH CORRECT. ~'}
+	{nl, '    Q360=+0    ;ADD. RADIUS CORRECT.'}
+	
+endp
+;-------------------------
+@cool_through_tool
+	
+	local integer l_through_coolant_val
+	if (through_coolant_val > 72) & (through_coolant_val < 77)
+		l_through_coolant_val = through_coolant_val
+	else
+		l_through_coolant_val = 75
+	endif
+	if l_through_coolant_val > 0 
+		{nb, 'M49 M' l_through_coolant_val:'5.0(n)' ' ; podacha cherez shpindel'}
+	endif
+	
+endp
+;-------------------------
+@spin
+	
+	{nb, 'S' spin_rate:'5.0(n)'}
+	if spin_direction eq 1 
+		{nb, 'M13'}
+	endif
+	if spin_direction eq 2 
+		{nb, 'M14'}
+	endif
+	
+endp
+;-------------------------
+@active_air_through_spindle
+	
+	if air_blast_coolant eq 1 
+		{nb, 'M61 ; podacha vozduha cherez shpindel'}
+	else 
+		{nb, 'M60 ; otkluchenie obduvki vozduhom'}
+	endif
+	
+endp
+;-------------------------
+@spindle_orient
+	
+	{nb, 'CYCL DEF 13.0 ORIENT.OSTAN.SPIND'}
+	{nb, 'CYCL DEF 13.1 UGOL' ValSpindleOrientation:'5.3(n)'}
+	{nb, 'M19'}
+	
+endp
+;-------------------------
+@move_object
+	
+	{nb, 'L '}
+	if userDef_x
+		if MCO_CoordSysType eq 1
+			{'X' move_axis_x:'+5.3(p)' ' '}
+		endif
+		if MCO_CoordSysType eq 2
+			{'X' xh_move:'+5.3(p)' ' '}
+		endif
+	endif
+	if userDef_y
+		if MCO_CoordSysType eq 1
+			{'Y' move_axis_y:'+5.3(p)' ' '}
+		endif
+		if MCO_CoordSysType eq 2
+			{'Y' yh_move:'+5.3(p)' ' '}
+		endif
+	endif
+	if userDef_z
+		if MCO_CoordSysType eq 1
+			{'Z' move_axis_z:'+5.3(p)' ' '}
+		endif
+		if MCO_CoordSysType eq 2
+			{'Z' zh_move:'+5.3(p)' ' '}
+		endif
+	endif
+	if userDef_b
+		if MCO_CoordSysType eq 1
+			{'A' move_axis_b:'+5.3(p)' ' '}
+		endif
+		if MCO_CoordSysType eq 2
+			{'A' bh_move:'+5.3(p)' ' '}
+		endif
+	endif
+	if userDef_a
+		if MCO_CoordSysType eq 1
+			{'C' move_axis_a:'+5.3(p)' ' '}
+		endif
+		if MCO_CoordSysType eq 2
+			{'C' ah_move:'+5.3(p)' ' '}
+		endif
+	endif
+	
+	if feed_move >= 30000
+		{'FMAX'}
+	else
+		{'F' feed_move:'5.0(n)'}
+	endif
+	
+	if MCO_CoordSysType eq 2
+		if DeviceIdNum ne 2
+			{' M91'}
+		endif
+	endif
+	
+	if MCO_CoordSysType eq 1
+		if DeviceIdNum eq 2
+			{' M91'}
+		endif
+	endif
+endp
+;-------------------------
+@unload_tool
+	
+	{nb, 'TOOL CALL 0 Z ; call null tool'}
+	
+endp
+;-------------------------
+@Misc_Option
+	
+	if MCO_Option_Name == 'mco_end_programm' 
+		; отключение тормозов в конце программы
+		if g_otkluchenie_tormozov
+			{nb, 'M10'}
+		endif
+		; отключение сож 
+		call @stop_coolent(g_status_coolent)
+			
+		call @reset_home
+		
+		if g_polomka_use
+			{nb, 'CALL LBL "POLOMKA" ; tool break control' }
+			{nb, 'TOOL CALL Q65 Z ; define blocking tool'}
+		endif
+		
+		{nb, '*=== END PROGRAMM ==='}
+		{nb, 'TOOL CALL ' TOOL_END:'5.0(n)' ' Z'}
+		if (A_ROOT ne 0) or (IC_ROOT ne 0)
+			{nb, 'L A' A_ROOT:'+5.3(p)' ' IC' IC_ROOT:'+5.3(p)' ' F' FEED_END:'5.0(n)'}
+		endif
+		if WAIT_END > 0
+			{nb, 'CYCL DEF 9.0 WYDERSHKA WREMENI'}
+			{nb, 'CYCL DEF 9.1 WYD.WR' WAIT_END:'5.0(n)'}
+		endif
+		{nb, 'L A' A_END:'+5.3(p)' ' C' C_END:'+5.3(p)' ' F' FEED_END:'5.0(n)'}
+		{nb, 'L X+800 R0 FMAX M91'}
+		{nb, 'M2'}
+	endif	
+
+	if MCO_Option_Name == 'EQUAL_TRANSFORM'
+		if TRANSF_EQ
+			g_transf_eq = true
+		else
+			g_transf_eq = false
+		endif
+	endif
+	
+endp
+;-------------------------
+@start_mach_ctrl
+	
+	g_mco_use = true
+	
+endp
+;-------------------------
+@end_mach_ctrl
+	
+	g_mco_use = false
+	
+endp
+;-------------------------
+
+	;+----------------------------------------+
+	;|				User procedures		  	  |
+	;+----------------------------------------+	
+
+;=============================
+@reset_home
+	
+	if USE_LBL & not(X5_job)
+		{nb, 'CALL LBL "SBROS"'}
+		return
+	endif
+	
+	if not((job_type == 'mw_drill_5x') & use_5x_move_for_5x_drill)
+		{nb, 'L Z+0 R0 FMAX M91'}
+	endif
+	
+	{nb, 'CYCL DEF 7.0 SMESCHENJE NULJA'}
+	{nb, 'CYCL DEF 7.1  X+0'}
+	{nb, 'CYCL DEF 7.2  Y+0'}
+	{nb, 'CYCL DEF 7.3  Z+0'}
+	{nb, 'PLANE RESET STAY'}
+	
+endp
+;=============================
+@MAC_is_change(integer proc_mac_number)
+	
+	if g_mac_number ne proc_mac_number
+		return_logical = true
+	else
+		return_logical = false
+	endif
+	
+endp
+;=============================
+@set_MAC(integer proc_mac_number)
+
+	g_mac_number = proc_mac_number
+
+endp
+;=============================
+@homePosXYZAC_is_change(numeric proc_x, numeric proc_y, numeric proc_z, numeric proc_a, numeric proc_c)
+	
+	return_logical = false; по умолчанию ничего не изменилось
+	
+	; сравнить X Y Z A C и установить возвращаемое значение в true 
+	; если хоть одно из значений изменилось
+	if g_x_home_old ne proc_x
+		return_logical = true
+	endif
+	
+	if g_y_home_old ne proc_y
+		return_logical = true
+	endif
+	
+	if g_z_home_old ne proc_z
+		return_logical = true
+	endif
+	
+	if g_a_home_old ne proc_a
+		return_logical = true
+	endif
+
+	if g_c_home_old ne proc_c
+		return_logical = true
+	endif
+	
+endp
+;=============================
+@setHomePosXYZAC(numeric proc_x, numeric proc_y, numeric proc_z, numeric proc_a, numeric proc_c)
+	
+	g_x_home_old = proc_x
+	g_y_home_old = proc_y
+	g_z_home_old = proc_z
+	g_a_home_old = proc_a
+	g_c_home_old = proc_c
+	
+endp
+;=============================
+@showHomePosXYZAC
+	
+	if USE_LBL & not(X5_job) & not(transform_4x)
+		{nb, 'CALL LBL "' g_mac_part_home '"'}
+		return
+	endif
+	
+	;вывести в файл уп виртуального смещения X Y Z и поворота стола A C
+		{nb, 'L Z+0 R0 FMAX M91'}
+		{nb, 'CYCL DEF 7.0 SMESCHENJE NULJA'}
+		{nb, 'CYCL DEF 7.1  X' g_x_home_old:'+5.3(p)'}
+		{nb, 'CYCL DEF 7.2  Y' g_y_home_old:'+5.3(p)'}
+		{nb, 'CYCL DEF 7.3  Z' g_z_home_old:'+5.3(p)'}
+	
+	; сброс без перемещений при пятиосевой обработке
+	if X5_job
+		{nb, 'PLANE RESET STAY'}
+		return
+	endif
+	
+	;определить знака угла разворота по оси ј
+		local string l_value_SEQ 
+		if g_a_home_old >= 0
+			l_value_SEQ = '+'
+		else
+			l_value_SEQ = '-'
+		endif
+	
+	; виртуальный разворот системы координат
+		{nb, 'PLANE SPATIAL SPA' g_a_home_old:'+5.3(p)' ' SPB+0 ' 'SPC' g_c_home_old:'+5.3(p)'}
+		{' STAY SEQ' l_value_SEQ ' TABLE ROT'}
+	
+	;физический разворот стола станка
+		if FOUR_X_MOVE_ALL
+			{nb, 'L X' g_xnext:'+5.3(p)' ' Y' g_ynext:'+5.3(p)' ' A' g_a_home_old:'+5.3(p)' ' C' g_c_home_old:'+5.3(p)'}
+		else
+			if FOUR_X_MOVE_ONLY_DRILL & ((job_type == 'drill') or (job_type == 'drill_hr'))
+				{nb, 'L X' g_xnext:'+5.3(p)' ' Y' g_ynext:'+5.3(p)' ' A' g_a_home_old:'+5.3(p)' ' C' g_c_home_old:'+5.3(p)'}
+			else
+				{nb, 'L ' 'A' g_a_home_old:'+5.3(p)' ' C' g_c_home_old:'+5.3(p)'}
+			endif
+		endif
+		
+		if (feed_A_C > 20000) or (feed_A_C == 0)
+			{' FMAX'}
+		else
+			{' F' (abs(feed_A_C)):feed_f}
+		endif
+	
+endp
+;=============================
+@toolType_geometryParameters
+	
+	local string l_tool_TGP ; - промежуточна¤, локальна¤, переменна¤ хран¤ща¤ тип и геометрию инструмента
+		l_tool_TGP = ''
+	local string l_tool_D ; диаметр инструмента
+		l_tool_D = tostr(tool_offset * 2:'5.3(p)')
+	;tool_type: FREZA => namber: 20
+	;tool_type: R_FREZA => namber: 1
+	;tool_type: ZENKOVKA => namber: 10
+	;tool_type: REZETS => namber: 17
+	;tool_type: SVERLO => namber: 0
+	;tool_type: METCHIK => namber: 12
+	;tool_type: TCUT_FREZA => namber: 11
+	;tool_type: T_FREZA => namber: 7
+	;tool_type: SF_FREZA => namber: 15
+	;tool_type: BALL_FREZA => namber: 8
+	;tool_type: CUT_FREZA => namber: 9
+	;tool_type: RCUT_FREZA => namber: 25
+	;tool_type: GRAVER => namber: 19
+	;tool_type: TSENTR_SVERLO => namber: 18
+	;tool_type: TSENTROVKA => namber: 21
+	;tool_type: RAZVYORTKA => namber: 16
+	
+	; ”станавливаетс¤ начальное значение и остаетс¤ в случае отсутстви¤ совпадени¤ типа
+	; инструментов
+	l_tool_TGP = 'FREZA' + '-D' + l_tool_D
+	
+	; \\define SVERLO
+	if (tool_type == drill)
+		l_tool_TGP = 'SVERLO' + '-D' + l_tool_D
+	endif
+	; \\define METCHIK
+	if (tool_type == tap_mill)
+		l_tool_TGP = 'METCHIK' + '-D' + l_tool_D
+		l_tool_TGP = l_tool_TGP + 'xP' + tostr(tool_drill_lead:'5.3(p)')
+	endif
+	; \\define T_FREZA
+	if (tool_type == slot_mill)
+		l_tool_TGP = 'T_FREZA' + '-D' + l_tool_D
+		l_tool_TGP = l_tool_TGP + '_B' + tostr(cutting_tool_length:'5.3(p)')
+	endif
+	; \\define T_FREZA_CUT
+	if (tool_type == dove_mill)
+		l_tool_TGP = 'T_FREZA_CUT' + '-D' + l_tool_D
+		l_tool_TGP = l_tool_TGP + '_B' + tostr(cutting_tool_length:'5.3(p)') + '_A' + tostr(tool_angle:'5.3(p)')
+	endif
+	; \\define SF_FREZA
+	if (tool_type == ball_nose)
+		l_tool_TGP = 'SF_FREZA' + '-D' + l_tool_D
+		l_tool_TGP = l_tool_TGP + '_R' + tostr(corner_radius:'5.3(p)')
+	endif
+	; \\define R_FREZA
+	if (tool_type == 1)
+		l_tool_TGP = 'R_FREZA' + '-D' + l_tool_D
+		l_tool_TGP = l_tool_TGP + '_R' + tostr(corner_radius:'5.3(p)')
+	endif
+	; \\define BALL_FREZA
+	if (tool_type == lollipop_mill)
+		l_tool_TGP = 'BALL_FREZA' + '-D' + l_tool_D
+		l_tool_TGP = l_tool_TGP + '_R' + tostr(corner_radius:'5.3(p)')
+	endif
+	; \\define CUT_FREZA
+	if (tool_type == taper_mill)
+		l_tool_TGP = 'CUT_FREZA' + '-D' + l_tool_D
+		if tool_taper_angle > 0
+			l_tool_TGP = l_tool_TGP + ' A' + tostr(tool_taper_angle:'5.3(p)')
+		endif
+	endif
+	; \\define CUT_FREZA_R
+	if (tool_type == 25)
+		l_tool_TGP = 'CUT_FREZA_R' + '-D' + l_tool_D
+		if tool_taper_angle > 0
+			l_tool_TGP = l_tool_TGP + ' A' + tostr(tool_taper_angle:'5.3(p)')
+		endif
+		l_tool_TGP = l_tool_TGP + ' R' + tostr(corner_radius:'5.3(p)')
+	endif
+	; \\define GRAVER
+	if (tool_type == engraving_mill)
+		l_tool_TGP = 'GRAVER' + '-D' + l_tool_D
+		l_tool_TGP = l_tool_TGP + ' R' + tostr(corner_radius:'5.3(p)')
+	endif
+	; \\define TSENTR_SVERLO
+	if (tool_type == center_drill)
+		l_tool_TGP = 'TSENTR_SVERLO' + '-D' + l_tool_D
+		l_tool_TGP = l_tool_TGP + ' A' + tostr(corner_radius:'5.3(p)')
+	endif
+	; \\define TSENTROVKA
+	if (tool_type == spot_drill)
+		l_tool_TGP = 'TSENTROVKA' + '-D' + l_tool_D
+		l_tool_TGP = l_tool_TGP + ' A' + tostr(corner_radius:'5.3(p)')
+	endif
+	; \\define ZENKOVKA
+	if (tool_type == chamfer_drill) 
+		l_tool_TGP = 'ZENKOVKA' + '-D' + l_tool_D
+		l_tool_TGP = l_tool_TGP + ' A' + tostr(corner_radius:'5.3(p)')
+	endif
+	; \\define REZBOFREZA
+	if tool_type == thread_mill
+		l_tool_TGP = 'REZBOFREZA' + '-D' + l_tool_D
+		l_tool_TGP = l_tool_TGP + 'xP' + tostr(tool_drill_lead:'5.3(p)')
+	endif
+	; \\define REZETS
+	if (tool_type == bore)
+		l_tool_TGP = 'REZETS' + '-D' + l_tool_D
+	endif
+	; \\define RAZVYORTKA
+	if (tool_type == reamer_mill)
+		l_tool_TGP = 'RAZVYORTKA' + '-D' + l_tool_D
+	endif
+	
+	; добавление количества канавок для отвода стружки в конец строки
+	l_tool_TGP = l_tool_TGP + ' Z' + tostr(tool_teeth_number:'5.0(n)')
+	
+	return_string = l_tool_TGP
+	
+endp
+;=============================
+@coment_job_name(string p_original_job_name)
+	
+	; вывести в файл уп имя перехода
+	; все, что следует за этим символом отсекается ' _'
+	
+	local integer l_strlen_string instr_string
+	instr_string = instr(p_original_job_name, ' _') ; количество символов до ' _'
+	l_strlen_string = strlen(p_original_job_name) ; длина строки
+	
+	if instr_string > 0
+		; если в строке присутствует ' _'
+		return_string = left(p_original_job_name, instr_string)
+		return_string = replace(return_string, " ", "", 0)
+	else
+		; если в строке присутствует  нет символов ' _', то вернуть переданное в функцию значкеие
+		return_string = p_original_job_name
+	endif
+
+endp
+;=============================
+@name_home_number(integer p_MAC_home, integer p_POS_home, string name_home)
+	
+	if name_home eq ''
+		return_string = 'MAC' + tostr(p_MAC_home:'5.0(p)') + ': POS' + tostr(p_POS_home:'5.0(p)')
+	else
+		return_string = 'MAC' + tostr(p_MAC_home:'5.0(p)') + ': ' + replace(name_home, " ", "_", 0)
+	endif
+	g_mac_part_home = 'MAC' + tostr(p_MAC_home:'5.0(p)') + '_POS' + tostr(p_POS_home:'5.0(p)')
+	
+endp
+;=============================
+@show_jobName ; вывод строки коментари¤ перехода
+	
+	; если имя текущего перехода осталось неизменным по отношению к последнему, то вывести 
+	; имя как коментарий
+	if active(g_job_name)
+		{nb, ';     - SolidCAM: ' original_job_name}
+	else
+		{nb, '*     - ' g_job_name}
+		{nb, ';     - SolidCAM: ' original_job_name}
+	endif
+	
+endp
+;=============================
+@show_homeName
+	
+	; вывод строку коментари¤ с именем нулевой точки
+	if FINISH_OPERATION & false
+		{nb, ';   - ' g_home_userName}
+	else
+		{nb, '*   - ' g_home_userName}
+	endif
+	
+endp
+;=============================
+@show_transforme_plane
+	
+	{nb, 'CYCL DEF 7.0 SMESCHENJE NULJA'}
+	{nb, 'CYCL DEF 7.1  X' g_shift_x_tr:'+5.3(p)'}
+	{nb, 'CYCL DEF 7.2  Y' g_shift_y_tr:'+5.3(p)'}
+	{nb, 'CYCL DEF 7.3  Z' g_shift_z_tr:'+5.3(p)'}
+	{nb, 'PLANE VECTOR BX+0 BY+0 BZ+0'}
+	{' NX' g_normal_to_plane_x:'+5.7z' ' NY' g_normal_to_plane_y:'+5.7z' ' NZ' g_normal_to_plane_z:'+5.7z' }
+	{' TURN MB MAX'}
+	if feed_A_C >= 20000
+		{' FMAX'}
+	else
+		{' F' feed_A_C:'5.0(n)'}
+	endif
+	if g_SEQ_transform < 0
+		{' SEQ-'}
+	else
+		{' SEQ+'}
+	endif
+	{' TABLE ROT'}
+	
+endp
+;=============================
+@set_drill_parameters
+	
+	if job_type eq 'drill'
+		g_safety_Q200 = safety
+		g_depth_Q201 = drill_depth - g_safety_Q200
+		g_surface_Q203 = job_upper_plane
+		g_clearance_plane_Q204 = job_clearance_plane - g_surface_Q203
+	endif
+	
+	if job_type == 'drill_hr'
+		g_safety_Q200 = safety
+		g_depth_Q201 = drill_depth - g_safety_Q200
+		g_surface_Q203 = drill_upper_z - g_safety_Q200
+		g_clearance_plane_Q204 = drill_clearance_z - g_surface_Q203
+	endif
+	
+	if job_type == 'mw_drill_5x'
+		g_safety_Q200 = safety
+		g_depth_Q201 = drill_depth - g_safety_Q200
+		g_surface_Q203 = (-1) * g_safety_Q200
+		g_clearance_plane_Q204 = retract_distance
+	endif
+	
+endp
+;=============================
+@classic_slot_214
+	
+	; g_cutting_tool_length - ширина фрезы
+	
+	local numeric l_perekrytie_frezy ; перекрыти фрезы 
+	if (Shag_Perekrytie_frezy > 0) & (Shag_Perekrytie_frezy < g_cutting_tool_length)
+		l_perekrytie_frezy = Shag_Perekrytie_frezy
+	else
+		l_perekrytie_frezy = 0.5 * g_cutting_tool_length
+	endif
+
+	local numeric l_surface_Q203 ; координата поверхности
+	local numeric l_depth_Q201 ; глубина фрезеровани¤
+	local numeric l_step_Q202 ; глубина врезани¤ 
+	local numeric l_clearance_plane_Q204 ; 2-е безопасное рассто¤ние
+	local numeric l_safety_Q200 ; рассто¤ние безопасности
+	; расчЄт параметров цикла
+	if abs(g_depth_Q201) <= g_cutting_tool_length
+		l_surface_Q203 = g_surface_Q203
+		l_depth_Q201 = g_depth_Q201
+		l_step_Q202 = l_depth_Q201
+		l_clearance_plane_Q204 = g_clearance_plane_Q204
+		l_safety_Q200 = g_safety_Q200
+	else
+		l_surface_Q203 = g_surface_Q203 - l_perekrytie_frezy
+		l_depth_Q201 = g_depth_Q201 - l_perekrytie_frezy
+		l_step_Q202 = g_cutting_tool_length - l_perekrytie_frezy
+		l_clearance_plane_Q204 = g_clearance_plane_Q204 + l_perekrytie_frezy
+		l_safety_Q200 = g_safety_Q200 + l_perekrytie_frezy
+	endif
+	
+	if g_dopTool_value<<1>> > 0
+		l_surface_Q203 = l_surface_Q203 - g_dopTool_value<<1>>
+		l_safety_Q200 = l_safety_Q200 + g_dopTool_value<<1>>
+		l_clearance_plane_Q204 = l_clearance_plane_Q204 + g_dopTool_value<<1>>
+	endif
+	
+	; отображение цикла
+	if g_drill_type == 10
+		{nb, 'CYCL DEF 214 CHIST.OBR.KR.KARMANA ~'}
+	endif
+	if g_drill_type == 11
+		{nb, 'CYCL DEF 215 CHIST.OBR.KR.STOJKI ~'}
+	endif
+	{nl, '	Q200=' l_safety_Q200:'+5.3(p)' '    ;RASSTO. BEZOPASNOSTI ~'}
+	{nl, '	Q201=' (l_depth_Q201 * (-1)):'+5.3(p)' '   ;GLUBINA ~'}
+	{nl, '	Q206=' podacha_vrezanie_Q206:'+5.0(p)' '  ;PODACHA NA WREZANJE ~'}
+	{nl, '	Q202=' l_step_Q202:'+5.3(p)' '    ;GLUBINA WREZANJA ~'}
+	{nl, '	Q207=' feed:'+5.0(p)' '  ;FEED RATE FOR MILLNG ~'}
+	{nl, '	Q203=' l_surface_Q203:'+5.3(p)' '    ;SURFACE COORDINATE ~'}
+	{nl, '	Q204=' l_clearance_plane_Q204:'+5.3(p)' '   ;2-JE BEZOP.RASSTOJ. ~'}
+	{nl, '	Q216=' g_xpos '   ;1-AJA KOORD.CENTRA ~'}
+	{nl, '	Q217=' g_ypos '   ;2-JA KOORD.CENTRA ~'}
+	{nl, '	Q222=' (abs(Diametr_chern_sverl)):'+5.3(p)' '    ;DIAMETR ZAGOTOWKI ~'}
+	{nl, '	Q223=' (abs(Zadannyi_diametr)):'+5.3(p)'  '    ;DIAM.GOTOWOJ DETALI'}
+	{nb, 'CYCL CALL ; classic slot'}
+	
+	
+endp
+;=============================
+@Slot_from_centr_214
+	
+	if abs(g_depth_Q201) <= g_cutting_tool_length
+		call @classic_slot_214
+		return
+	endif
+	
+	local numeric l_surface_Q203 ; координата поверхности
+	local numeric l_depth_Q201 ; глубина фрезеровани¤
+	local numeric l_step_Q202 ; глубина врезани¤ 
+	local numeric l_clearance_plane_Q204 ; 2-е безопасное рассто¤ние
+	local numeric l_safety_Q200 ; рассто¤ние безопасности
+	
+	; определение значени¤ перекрыти¤ фрезы
+	local numeric l_perekrytie_frezy ; перекрыти фрезы 
+	if (Shag_Perekrytie_frezy > 0) & (Shag_Perekrytie_frezy < g_cutting_tool_length)
+		l_perekrytie_frezy = Shag_Perekrytie_frezy
+	else
+		l_perekrytie_frezy = 0.5 * g_cutting_tool_length
+	endif
+	
+	; определение расчетного значени¤ перекрытия
+	local numeric l_perekrytie_rasch ; расчитанна¤ величина перекрытия фрезы
+	l_perekrytie_rasch = ((3 * g_cutting_tool_length) - g_depth_Q201) / 2
+	
+	; определить является тип цикла с симетричным припуском сверху и снизу
+	local logical from_centr_symmetry ; переменна¤ формы отображения цикла
+	if (l_perekrytie_rasch > 0) & (l_perekrytie_rasch >= l_perekrytie_frezy)
+		from_centr_symmetry = true
+	else
+		from_centr_symmetry = false
+	endif
+	
+	local integer l_iteration ; итерация цикла while
+	local string l_name_coment ; коментарий к переходу
+	local integer l_feed ; подача
+	l_iteration = 0
+	
+	; припуск равен сверху и снизу
+	if from_centr_symmetry
+		while (l_iteration < 3)
+			if l_iteration == 0
+				l_surface_Q203 = g_surface_Q203
+				l_depth_Q201 = ((g_depth_Q201 / 2) + (g_cutting_tool_length / 2))
+				l_step_Q202 = l_depth_Q201
+				l_clearance_plane_Q204 = g_clearance_plane_Q204
+				l_safety_Q200 = g_safety_Q200
+				l_name_coment = 'po tsentru'
+				l_feed = (0.7 *feed)
+			endif
+			if l_iteration == 1
+				l_step_Q202 = g_cutting_tool_length
+				l_depth_Q201 = l_step_Q202
+				l_feed = feed
+				l_name_coment = 'verhniy torets'
+			endif
+			if l_iteration == 2
+				l_step_Q202 = g_depth_Q201
+				l_depth_Q201 = l_step_Q202
+				l_feed = feed
+				l_name_coment = 'nizhniy torets'
+			endif
+			
+			if g_dopTool_value<<1>> > 0
+				l_depth_Q201 = l_depth_Q201 + g_dopTool_value<<1>>
+				l_step_Q202 = l_depth_Q201
+			endif
+			
+			if g_drill_type == 10
+				{nb, 'CYCL DEF 214 CHIST.OBR.KR.KARMANA ~'}
+			endif
+			if g_drill_type == 11
+				{nb, 'CYCL DEF 215 CHIST.OBR.KR.STOJKI ~'}
+			endif
+			{nl, '	Q200=' l_safety_Q200:'+5.3(p)' '    ;RASSTO. BEZOPASNOSTI ~'}
+			{nl, '	Q201=' (l_depth_Q201 * (-1)):'+5.3(p)' '   ;GLUBINA ~'}
+			{nl, '	Q206=' podacha_vrezanie_Q206:'+5.0(p)' '  ;PODACHA NA WREZANJE ~'}
+			{nl, '	Q202=' l_step_Q202:'+5.3(p)' '    ;GLUBINA WREZANJA ~'}
+			{nl, '	Q207=' l_feed:'+5.0(p)' '  ;FEED RATE FOR MILLNG ~'}
+			{nl, '	Q203=' l_surface_Q203:'+5.3(p)' '    ;SURFACE COORDINATE ~'}
+			{nl, '	Q204=' l_clearance_plane_Q204:'+5.3(p)' '   ;2-JE BEZOP.RASSTOJ. ~'}
+			{nl, '	Q216=' g_xpos '   ;1-AJA KOORD.CENTRA ~'}
+			{nl, '	Q217=' g_ypos '   ;2-JA KOORD.CENTRA ~'}
+			{nl, '	Q222=' (abs(Diametr_chern_sverl)):'+5.3(p)' '    ;DIAMETR ZAGOTOWKI ~'}
+			{nl, '	Q223=' (abs(Zadannyi_diametr)):'+5.3(p)'  '    ;DIAM.GOTOWOJ DETALI'}
+			{nb, 'CYCL CALL ; ' l_name_coment}
+			
+			l_iteration = l_iteration + 1	
+		endw
+	endif
+	
+	if not(from_centr_symmetry)
+		l_surface_Q203 = g_surface_Q203
+		l_depth_Q201 = (1.2 * g_cutting_tool_length)
+		l_step_Q202 = l_depth_Q201
+		l_clearance_plane_Q204 = g_clearance_plane_Q204
+		l_safety_Q200 = g_safety_Q200
+		
+		if g_dopTool_value<<1>> > 0
+			l_surface_Q203 = l_surface_Q203 - g_dopTool_value<<1>>
+			l_safety_Q200 = l_safety_Q200 + g_dopTool_value<<1>>
+			l_clearance_plane_Q204 = l_clearance_plane_Q204 + g_dopTool_value<<1>>
+		endif
+
+		if g_drill_type == 10
+			{nb, 'CYCL DEF 214 CHIST.OBR.KR.KARMANA ~'}
+		endif
+		if g_drill_type == 11
+			{nb, 'CYCL DEF 215 CHIST.OBR.KR.STOJKI ~'}
+		endif
+		{nl, '	Q200=' l_safety_Q200:'+5.3(p)' '    ;RASSTO. BEZOPASNOSTI ~'}
+		{nl, '	Q201=' (l_depth_Q201 * (-1)):'+5.3(p)' '   ;GLUBINA ~'}
+		{nl, '	Q206=' podacha_vrezanie_Q206:'+5.0(p)' '  ;PODACHA NA WREZANJE ~'}
+		{nl, '	Q202=' l_step_Q202:'+5.3(p)' '    ;GLUBINA WREZANJA ~'}
+		{nl, '	Q207=' (0.7 * feed):'+5.0(p)' '  ;FEED RATE FOR MILLNG ~'}
+		{nl, '	Q203=' l_surface_Q203:'+5.3(p)' '    ;SURFACE COORDINATE ~'}
+		{nl, '	Q204=' l_clearance_plane_Q204:'+5.3(p)' '   ;2-JE BEZOP.RASSTOJ. ~'}
+		{nl, '	Q216=' g_xpos '   ;1-AJA KOORD.CENTRA ~'}
+		{nl, '	Q217=' g_ypos '   ;2-JA KOORD.CENTRA ~'}
+		{nl, '	Q222=' (abs(Diametr_chern_sverl)):'+5.3(p)' '    ;DIAMETR ZAGOTOWKI ~'}
+		{nl, '	Q223=' (abs(Zadannyi_diametr)):'+5.3(p)'  '    ;DIAM.GOTOWOJ DETALI'}
+		{nb, 'CYCL CALL ; po tsentru'}
+		{nb, 'HI'}
+		{nb, 'g_cutting_tool_length: ' g_cutting_tool_length}
+		call @classic_slot_214
+	endif
+	
+endp
+;=============================
+@Slot_use_cycle208_214
+	
+	local numeric pripusk_pod_chistov ; припуск под чистовую обработку торца
+	pripusk_pod_chistov = 0.2
+
+	if g_depth_Q201 < (g_cutting_tool_length + (pripusk_pod_chistov * 2))
+		call @classic_slot_214
+		return
+	endif
+	
+	local numeric l_surface_Q203 ; координата поверхности
+	local numeric l_depth_Q201 ; глубина фрезеровани¤
+	local numeric l_step_Q202 ; глубина врезани¤ 
+	local numeric l_clearance_plane_Q204 ; 2-е безопасное рассто¤ние
+	local numeric l_safety_Q200 ; рассто¤ние безопасности
+	
+	l_depth_Q201 = g_cutting_tool_length + pripusk_pod_chistov
+	l_step_Q202 = l_depth_Q201
+	
+	if g_dopTool_value<<1>> > 0
+		l_depth_Q201 = l_depth_Q201 + g_dopTool_value<<1>>
+		l_step_Q202 = l_depth_Q201
+	endif
+	
+	if g_drill_type == 10
+		{nb, 'CYCL DEF 214 CHIST.OBR.KR.KARMANA ~'}
+	endif
+	if g_drill_type == 11
+		{nb, 'CYCL DEF 215 CHIST.OBR.KR.STOJKI ~'}
+	endif
+	{nl, '	Q200=' g_safety_Q200:'+5.3(p)' '    ;RASSTO. BEZOPASNOSTI ~'}
+	{nl, '	Q201=' (l_depth_Q201 * (-1)):'+5.3(p)' '   ;GLUBINA ~'}
+	{nl, '	Q206=' podacha_vrezanie_Q206:'+5.0(p)' '  ;PODACHA NA WREZANJE ~'}
+	{nl, '	Q202=' l_step_Q202:'+5.3(p)' '    ;GLUBINA WREZANJA ~'}
+	{nl, '	Q207=' (0.7 * feed):'+5.0(p)' '  ;FEED RATE FOR MILLNG ~'}
+	{nl, '	Q203=' g_surface_Q203:'+5.3(p)' '    ;SURFACE COORDINATE ~'}
+	{nl, '	Q204=' g_clearance_plane_Q204:'+5.3(p)' '   ;2-JE BEZOP.RASSTOJ. ~'}
+	{nl, '	Q216=' g_xpos '   ;1-AJA KOORD.CENTRA ~'}
+	{nl, '	Q217=' g_ypos '   ;2-JA KOORD.CENTRA ~'}
+	{nl, '	Q222=' (abs(Diametr_chern_sverl)):'+5.3(p)' '    ;DIAMETR ZAGOTOWKI ~'}
+	{nl, '	Q223=' (abs(Zadannyi_diametr)):'+5.3(p)'  '    ;DIAM.GOTOWOJ DETALI'}
+	{nb, 'CYCL CALL ; pod cycle 208'}
+	
+	; ÷икл 208
+	l_surface_Q203 = g_surface_Q203 - (g_cutting_tool_length + pripusk_pod_chistov)
+	l_depth_Q201 = g_depth_Q201 - (g_cutting_tool_length + pripusk_pod_chistov)
+	l_clearance_plane_Q204 = g_clearance_plane_Q204 + (g_cutting_tool_length + pripusk_pod_chistov)
+	
+	if g_dopTool_value<<1>> > 0
+		l_surface_Q203 = l_surface_Q203 - g_dopTool_value<<1>>
+		l_clearance_plane_Q204 = l_clearance_plane_Q204 + g_dopTool_value<<1>>
+	endif
+	
+	{nb, 'TOOL CALL ' 'Z S' t_boring_spin}
+	{nb, 'CYCL DEF 208 BORE MILLING ~'}
+	{nl, '	Q200=+0	;RASSTO. BEZOPASNOSTI ~'}
+	{nl, '	Q201=' (l_depth_Q201 * (-1)):'+5.3(p)'   '	;GLUBINA ~'}
+	{nl, '	Q206=' t_boring_feed:'+5.0(p)'  	'	;PODACHA NA WREZANJE ~'}
+	{nl, '	Q334='	t_boring_step:'+5.3(p)'	'	;GLUBINA WREZANJA ~'}
+	{nl, '	Q203=' l_surface_Q203:'+5.3(p)'  '	;SURFACE COORDINATE ~'}
+	{nl, '	Q204=' l_clearance_plane_Q204:'+5.3(p)'   '	;2-JE BEZOP.RASSTOJ. ~'}
+	{nl, '	Q335='	(abs(Zadannyi_diametr)):'+5.3(p)' 	'	;NOMINALNYJ DIAMETR ~'}
+	{nl, '	Q342='	(abs(Diametr_chern_sverl)):'+5.3(p)'	'	;DIAM. CHER.SWERLENIA ~'}
+	{nl, '	Q351=+1    ;WID FREZEROWANIA'}
+	{nb, 'L' ' X' g_xpos ' Y' g_ypos ' R0 FMAX M99 ; boring cycle 208'}
+	{nb, 'TOOL CALL ' 'Z S' spin}
+	
+	l_surface_Q203 = g_surface_Q203
+	l_depth_Q201 = g_cutting_tool_length
+	l_step_Q202 = l_depth_Q201
+	l_clearance_plane_Q204 = g_clearance_plane_Q204
+	l_safety_Q200 = g_safety_Q200
+	
+	if g_dopTool_value<<1>> > 0
+		l_depth_Q201 = l_depth_Q201 + g_dopTool_value<<1>>
+		l_step_Q202 = l_depth_Q201
+	endif
+	
+	if g_drill_type == 10
+		{nb, 'CYCL DEF 214 CHIST.OBR.KR.KARMANA ~'}
+	endif
+	if g_drill_type == 11
+		{nb, 'CYCL DEF 215 CHIST.OBR.KR.STOJKI ~'}
+	endif
+	{nl, '	Q200=' l_safety_Q200:'+5.3(p)' '    ;RASSTO. BEZOPASNOSTI ~'}
+	{nl, '	Q201=' (l_depth_Q201 * (-1)):'+5.3(p)' '   ;GLUBINA ~'}
+	{nl, '	Q206=' podacha_vrezanie_Q206:'+5.0(p)' '  ;PODACHA NA WREZANJE ~'}
+	{nl, '	Q202=' l_step_Q202:'+5.3(p)' '    ;GLUBINA WREZANJA ~'}
+	{nl, '	Q207=' feed:'+5.0(p)' '  ;FEED RATE FOR MILLNG ~'}
+	{nl, '	Q203=' l_surface_Q203:'+5.3(p)' '    ;SURFACE COORDINATE ~'}
+	{nl, '	Q204=' l_clearance_plane_Q204:'+5.3(p)' '   ;2-JE BEZOP.RASSTOJ. ~'}
+	{nl, '	Q216=' g_xpos '   ;1-AJA KOORD.CENTRA ~'}
+	{nl, '	Q217=' g_ypos '   ;2-JA KOORD.CENTRA ~'}
+	{nl, '	Q222=' (abs(Diametr_chern_sverl)):'+5.3(p)' '    ;DIAMETR ZAGOTOWKI ~'}
+	{nl, '	Q223=' (abs(Zadannyi_diametr)):'+5.3(p)'  '    ;DIAM.GOTOWOJ DETALI'}
+	{nb, 'CYCL CALL ; verh chisto'}
+	
+endp
+;=============================
+@Slot_chamfer_214
+	
+	local numeric l_depth_Q201 ; глубина фрезеровани¤
+	local numeric l_step_Q202 ; глубина врезани¤ 
+	local string l_name_coment ; коментарий перехода
+	
+	if Dop_tool_number == 0
+		if g_dopTool_value<<1>> > 0
+			l_depth_Q201 = g_dopTool_value<<1>>
+			l_step_Q202 = l_depth_Q201
+			l_name_coment = 'niz kanavki'
+		else
+			l_depth_Q201 = g_depth_Q201
+			if Shag_Perekrytie_frezy > 0
+				l_step_Q202 = Shag_Perekrytie_frezy
+			else
+				l_step_Q202 = l_depth_Q201
+			endif
+			l_name_coment = 'classic cycle 214'
+		endif
+	endif
+	
+	if Dop_tool_number == 1
+		l_depth_Q201 = g_cutting_tool_length + g_dopTool_value<<1>>
+		l_step_Q202 = l_depth_Q201
+		l_name_coment = 'verh kanavki'
+	endif
+	
+	if g_drill_type == 10
+		{nb, 'CYCL DEF 214 CHIST.OBR.KR.KARMANA ~'}
+	endif
+	if g_drill_type == 11
+		{nb, 'CYCL DEF 215 CHIST.OBR.KR.STOJKI ~'}
+	endif
+	{nl, '	Q200=' g_safety_Q200:'+5.3(p)' '    ;RASSTO. BEZOPASNOSTI ~'}
+	{nl, '	Q201=' (l_depth_Q201 * (-1)):'+5.3(p)' '   ;GLUBINA ~'}
+	{nl, '	Q206=' podacha_vrezanie_Q206:'+5.0(p)' '  ;PODACHA NA WREZANJE ~'}
+	{nl, '	Q202=' l_step_Q202:'+5.3(p)' '    ;GLUBINA WREZANJA ~'}
+	{nl, '	Q207=' feed:'+5.0(p)' '  ;FEED RATE FOR MILLNG ~'}
+	{nl, '	Q203=' g_surface_Q203:'+5.3(p)' '    ;SURFACE COORDINATE ~'}
+	{nl, '	Q204=' g_clearance_plane_Q204:'+5.3(p)' '   ;2-JE BEZOP.RASSTOJ. ~'}
+	{nl, '	Q216=' g_xpos '   ;1-AJA KOORD.CENTRA ~'}
+	{nl, '	Q217=' g_ypos '   ;2-JA KOORD.CENTRA ~'}
+	{nl, '	Q222=' (abs(Diametr_chern_sverl)):'+5.3(p)' '    ;DIAMETR ZAGOTOWKI ~'}
+	{nl, '	Q223=' (abs(Zadannyi_diametr)):'+5.3(p)'  '    ;DIAM.GOTOWOJ DETALI'}
+	{nb, 'CYCL CALL ; ' l_name_coment}
+	
+endp
+;=============================
+@Slot_double_chamfer_214
+	
+	local numeric l_depth_Q201 ; глубина фрезеровани¤
+	local numeric l_step_Q202 ; глубина врезани¤ 
+	local string l_name_coment ; коментарий перехода
+	
+	local integer l_iteration ; итераци¤ цикла while
+	l_iteration = 0
+	while (l_iteration < 2)
+		if l_iteration == 0
+			l_depth_Q201 = g_cutting_tool_length
+			l_step_Q202 = l_depth_Q201
+			l_name_coment = 'verh kanavki'
+		endif
+		if l_iteration == 1
+			l_depth_Q201 = g_depth_Q201
+			l_step_Q202 = l_depth_Q201
+			l_name_coment = 'niz kanavki'
+		endif
+		
+		if g_dopTool_value<<1>> > 0
+			l_depth_Q201 = l_depth_Q201 + g_dopTool_value<<1>>
+			l_step_Q202 = l_depth_Q201
+		endif
+
+		if g_drill_type == 10
+			{nb, 'CYCL DEF 214 CHIST.OBR.KR.KARMANA ~'}
+		endif
+		if g_drill_type == 11
+			{nb, 'CYCL DEF 215 CHIST.OBR.KR.STOJKI ~'}
+		endif
+		{nl, '	Q200=' g_safety_Q200:'+5.3(p)' '    ;RASSTO. BEZOPASNOSTI ~'}
+		{nl, '	Q201=' (l_depth_Q201 * (-1)):'+5.3(p)' '   ;GLUBINA ~'}
+		{nl, '	Q206=' podacha_vrezanie_Q206:'+5.0(p)' '  ;PODACHA NA WREZANJE ~'}
+		{nl, '	Q202=' l_step_Q202:'+5.3(p)' '    ;GLUBINA WREZANJA ~'}
+		{nl, '	Q207=' feed:'+5.0(p)' '  ;FEED RATE FOR MILLNG ~'}
+		{nl, '	Q203=' g_surface_Q203:'+5.3(p)' '    ;SURFACE COORDINATE ~'}
+		{nl, '	Q204=' g_clearance_plane_Q204:'+5.3(p)' '   ;2-JE BEZOP.RASSTOJ. ~'}
+		{nl, '	Q216=' g_xpos '   ;1-AJA KOORD.CENTRA ~'}
+		{nl, '	Q217=' g_ypos '   ;2-JA KOORD.CENTRA ~'}
+		{nl, '	Q222=' (abs(Diametr_chern_sverl)):'+5.3(p)' '    ;DIAMETR ZAGOTOWKI ~'}
+		{nl, '	Q223=' (abs(Zadannyi_diametr)):'+5.3(p)'  '    ;DIAM.GOTOWOJ DETALI'}
+		{nb, 'CYCL CALL ; ' l_name_coment}
+		
+		l_iteration = l_iteration + 1	
+	endw
+	
+endp
+;=============================
+@Chamfer_mill_214
+	
+	local numeric l_depth_Q201 ; глубина фрезеровани¤
+	local numeric l_step_Q202 ; глубина врезани¤ 
+	
+	; расчЄт параметров цикла
+	if (g_dopTool_value<<(Dop_tool_number + 1)>>) > 0
+		l_depth_Q201 = g_dopTool_value<<(Dop_tool_number + 1)>>
+		l_step_Q202 = l_depth_Q201
+	else
+		l_depth_Q201 = g_depth_Q201
+		if Shag_Perekrytie_frezy > 0
+			l_step_Q202 = Shag_Perekrytie_frezy
+		else
+			l_step_Q202 = l_depth_Q201
+		endif
+	endif
+	
+	; отображение цикла
+	if g_drill_type == 10
+		{nb, 'CYCL DEF 214 CHIST.OBR.KR.KARMANA ~'}
+	endif
+	if g_drill_type == 11
+		{nb, 'CYCL DEF 215 CHIST.OBR.KR.STOJKI ~'}
+	endif
+	{nl, '	Q200=' g_safety_Q200:'+5.3(p)' '    ;RASSTO. BEZOPASNOSTI ~'}
+	{nl, '	Q201=' (l_depth_Q201 * (-1)):'+5.3(p)' '   ;GLUBINA ~'}
+	{nl, '	Q206=' podacha_vrezanie_Q206:'+5.0(p)' '  ;PODACHA NA WREZANJE ~'}
+	{nl, '	Q202=' l_step_Q202:'+5.3(p)' '    ;GLUBINA WREZANJA ~'}
+	{nl, '	Q207=' feed:'+5.0(p)' '  ;FEED RATE FOR MILLNG ~'}
+	{nl, '	Q203=' g_surface_Q203:'+5.3(p)' '    ;SURFACE COORDINATE ~'}
+	{nl, '	Q204=' g_clearance_plane_Q204:'+5.3(p)' '   ;2-JE BEZOP.RASSTOJ. ~'}
+	{nl, '	Q216=' g_xpos '   ;1-AJA KOORD.CENTRA ~'}
+	{nl, '	Q217=' g_ypos '   ;2-JA KOORD.CENTRA ~'}
+	{nl, '	Q222=' (abs(Diametr_chern_sverl)):'+5.3(p)' '    ;DIAMETR ZAGOTOWKI ~'}
+	{nl, '	Q223=' (abs(Zadannyi_diametr)):'+5.3(p)'  '    ;DIAM.GOTOWOJ DETALI'}
+	{nb, 'CYCL CALL ; Chamfer_mill'}
+	
+endp
+;=============================
+@Other_mill_214
+	
+	local numeric l_step_Q202 ; глубина врезани¤ 
+	if Shag_Perekrytie_frezy > 0
+		l_step_Q202 = Shag_Perekrytie_frezy
+	else
+		l_step_Q202 = g_depth_Q201
+	endif
+		
+	if g_drill_type == 10
+		{nb, 'CYCL DEF 214 CHIST.OBR.KR.KARMANA ~'}
+	endif
+	if g_drill_type == 11
+		{nb, 'CYCL DEF 215 CHIST.OBR.KR.STOJKI ~'}
+	endif
+	{nl, '	Q200=' g_safety_Q200:'+5.3(p)' '    ;RASSTO. BEZOPASNOSTI ~'}
+	{nl, '	Q201=' (g_depth_Q201 * (-1)):'+5.3(p)' '   ;GLUBINA ~'}
+	{nl, '	Q206=' podacha_vrezanie_Q206:'+5.0(p)' '  ;PODACHA NA WREZANJE ~'}
+	{nl, '	Q202=' l_step_Q202:'+5.3(p)' '    ;GLUBINA WREZANJA ~'}
+	{nl, '	Q207=' feed:'+5.0(p)' '  ;FEED RATE FOR MILLNG ~'}
+	{nl, '	Q203=' g_surface_Q203:'+5.3(p)' '    ;SURFACE COORDINATE ~'}
+	{nl, '	Q204=' g_clearance_plane_Q204:'+5.3(p)' '   ;2-JE BEZOP.RASSTOJ. ~'}
+	{nl, '	Q216=' g_xpos '   ;1-AJA KOORD.CENTRA ~'}
+	{nl, '	Q217=' g_ypos '   ;2-JA KOORD.CENTRA ~'}
+	{nl, '	Q222=' (abs(Diametr_chern_sverl)):'+5.3(p)' '    ;DIAMETR ZAGOTOWKI ~'}
+	{nl, '	Q223=' (abs(Zadannyi_diametr)):'+5.3(p)'  '    ;DIAM.GOTOWOJ DETALI'}
+	{nb, 'CYCL CALL ; classic cycle 214'}
+	
+endp
+;=============================
+@t_radius_skrugl_niz
+	
+	local numeric start_z_traekt_skr ; высота старта траектории скруглени¤ канавки по Z
+	local numeric l_angel_step_RskrK ; угловой шаг на радиусе скруглени¤
+	local numeric radius_tr_skr ; радиус траэктории инструмента на скруглении канавки
+	local numeric radius_kanavki_bez_skr ; радиус канавки без скруглени¤
+	
+	start_z_traekt_skr = g_surface_Q203 - g_depth_Q201 + Radius_skrugleniya_kanavki
+	l_angel_step_RskrK = 2 * asin(step_radius / (2 * Radius_skrugleniya_kanavki))
+	radius_tr_skr = Radius_skrugleniya_kanavki - corner_radius
+	radius_kanavki_bez_skr = (Zadannyi_diametr / 2) - Radius_skrugleniya_kanavki
+
+	local numeric w_angel_step_w
+		w_angel_step_w = 0
+	local numeric l_step_z ; приращение по оси z от начала старта скруглени¤
+	local numeric l_step_r ; значение точки пересекающей радиус скруглени¤ при текущем угле шага скруглени¤
+	local numeric l_cc_arc_x l_cc_arc_y ; координаты центра дуги 
+	local integer l_znak_podvoda ; знак мен¤ющий позицию центра при подводе
+		l_znak_podvoda = -1
+	local numeric l_last_step_r
+		l_last_step_r = radius_tr_skr
+	{nb, '; start of milling radius slot'}
+	while true
+		; обновление услови¤ цикла. ѕрибавление углового шага на скруглении канавки
+		w_angel_step_w = w_angel_step_w + l_angel_step_RskrK
+		l_znak_podvoda = -1 * l_znak_podvoda
+		
+		if w_angel_step_w >= 90
+			w_angel_step_w = 90
+		endif
+
+		l_step_z = radius_tr_skr * sin(w_angel_step_w)
+		l_step_r = radius_tr_skr * cos(w_angel_step_w)
+		
+		;{nb, '; step_angel: ' w_angel_step_w}
+		l_cc_arc_x = l_znak_podvoda * (l_last_step_r - l_step_r) + g_xpos
+		l_cc_arc_y = g_ypos
+		{nb, 'CC X' l_cc_arc_x:'+5.3(p)' ' Y' l_cc_arc_y}
+		{nb, 'CP IPA+180 Z' (start_z_traekt_skr - l_step_z - corner_radius):'+5.3(p)' ' DR+'}
+		{nb, 'CC X' g_xpos ' Y' g_ypos}
+		{nb, 'C X' (g_xpos - l_znak_podvoda * (radius_kanavki_bez_skr + l_step_r + corner_radius)):'+5.3(p)' ' Y' g_ypos ' DR+ RL'}
+
+		l_last_step_r = l_step_r
+		if w_angel_step_w == 90
+			break
+		endif
+	endw
+	{nb, 'L X' g_xpos ' Y' g_ypos ' R0 F' (2 * feed):'+5.0(p)'}
+	{nb, 'L Z' (g_surface_Q203 + g_clearance_plane_Q204):'+5.3(p)' ' FMAX'}
+endp
+;=============================
+@t_radius_skrugl_verh
+	
+	local numeric start_z_traekt_skr ; высота старта траектории скруглени¤ канавки по Z
+	local numeric l_angel_step_RskrK ; угловой шаг на радиусе скруглени¤
+	local numeric radius_tr_skr ; радиус траэктории инструмента на скруглении канавки
+	local numeric radius_kanavki_bez_skr ; радиус канавки без скруглени¤
+	local numeric l_corner_radius ; радиус скруглени¤ инструмента
+	
+	if (g_dopTool_value<<2>> > 0) & Use_verhn_kanavka
+		l_corner_radius = g_dopTool_value<<2>>
+	else
+		l_corner_radius = corner_radius
+	endif
+	
+	start_z_traekt_skr = g_surface_Q203 - Radius_skrugleniya_kanavki
+	l_angel_step_RskrK = 2 * asin(step_radius / (2 * Radius_skrugleniya_kanavki))
+	radius_tr_skr = Radius_skrugleniya_kanavki - l_corner_radius
+	radius_kanavki_bez_skr = (Zadannyi_diametr / 2) - Radius_skrugleniya_kanavki
+
+	{nb, ' --> corner_radius: ' l_corner_radius}
+	{nb, ' --> l_angel_step_RskrK: ' l_angel_step_RskrK}
+	{nb, ' --> radius_tr_skr: ' radius_tr_skr}
+	{nb, ' --> start_z_traekt_skr: ' start_z_traekt_skr}
+	
+	local numeric w_angel_step_w
+		w_angel_step_w = 90
+	local numeric l_step_z ; приращение по оси z от начала старта скруглени¤
+	local numeric l_step_r ; значение точки пересекающей радиус скруглени¤ при текущем угле шага скруглени¤
+	local numeric l_cc_arc_x l_cc_arc_y ; координаты центра дуги 
+	local integer l_znak_podvoda ; знак мен¤ющий позицию центра при подводе
+		l_znak_podvoda = -1
+	local numeric l_last_step_r
+		l_last_step_r = 0
+	{nb, '; start of milling radius slot'}
+	while true
+		; обновление услови¤ цикла. ѕрибавление углового шага на скруглении канавки
+		w_angel_step_w = w_angel_step_w - l_angel_step_RskrK
+		l_znak_podvoda = -1 * l_znak_podvoda
+		
+		if w_angel_step_w <= 0
+			w_angel_step_w = 0
+		endif
+
+		l_step_z = radius_tr_skr * sin(w_angel_step_w)
+		l_step_r = radius_tr_skr * cos(w_angel_step_w)
+
+		l_cc_arc_x = l_znak_podvoda * (l_step_r - l_last_step_r) + g_xpos
+		l_cc_arc_y = g_ypos
+		{nb, 'CC X' l_cc_arc_x:'+5.3(p)' ' Y' l_cc_arc_y}
+		{nb, 'CP IPA+180 Z' (start_z_traekt_skr + l_step_z - (g_cutting_tool_length - l_corner_radius)):'+5.3(p)' ' DR+'}
+		{nb, 'CC X' g_xpos ' Y' g_ypos}
+		{nb, 'C X' (g_xpos - l_znak_podvoda * (radius_kanavki_bez_skr + l_step_r + l_corner_radius)):'+5.3(p)' ' Y' g_ypos ' DR+ RL'}
+
+		l_last_step_r = l_step_r
+		if w_angel_step_w == 0
+			break
+		endif
+	endw
+	{nb, 'L X' g_xpos ' Y' g_ypos ' R0 F' (2 * feed):'+5.0(p)'}
+	{nb, 'L Z' (g_surface_Q203 + g_clearance_plane_Q204):'+5.3(p)' ' FMAX'}
+endp
+;=============================
+@t_radius_cylynder
+	
+	local numeric l_depth_Q201 ; глубина фрезеровани¤
+	local numeric l_step_Q202 ; глубина врезани¤ 
+	local numeric l_surface_Q203 ; координата поверхности 
+	local numeric l_clearance_plane_Q204 ; 2-е безопасное рассто¤ние
+	local numeric l_corner_radius ; радиус скруглени¤ инструмента
+	
+	if (g_dopTool_value<<2>> > 0) & Use_verhn_kanavka
+		l_corner_radius = g_dopTool_value<<2>>
+	else
+		l_corner_radius = corner_radius
+	endif
+	
+	
+	; обработка нижнего радиуса скруглени¤
+	; цилиндрическа¤ часть канавки
+	if Use_verhn_kanavka
+		l_surface_Q203 = g_surface_Q203 - Radius_skrugleniya_kanavki - (g_cutting_tool_length - l_corner_radius)
+		l_depth_Q201 = abs((g_surface_Q203 - g_depth_Q201 - g_cutting_tool_length) - l_surface_Q203)
+		l_step_Q202 = abs(step_cylinder_z)
+		l_clearance_plane_Q204 = g_clearance_plane_Q204 + Radius_skrugleniya_kanavki + (g_cutting_tool_length - l_corner_radius)
+	else
+		l_surface_Q203 = g_surface_Q203
+		l_depth_Q201 = abs(g_depth_Q201 - ((abs(Radius_skrugleniya_kanavki)) - l_corner_radius))
+		l_step_Q202 = abs(step_cylinder_z)
+		l_clearance_plane_Q204 = g_clearance_plane_Q204
+	endif
+	{nb, '; boryng cylinder t-radius'}
+	{nb, 'CYCL DEF 208 BORE MILLING ~'}
+	{nl, '	Q200=+0	;RASSTO. BEZOPASNOSTI ~'}
+	{nl, '	Q201=' (l_depth_Q201 * (-1)):'+5.3(p)'   '	;GLUBINA ~'}
+	{nl, '	Q206=' feed:'+5.0(p)'  	'	;PODACHA NA WREZANJE ~'}
+	{nl, '	Q334='	l_step_Q202:'+5.3(p)'	'	;GLUBINA WREZANJA ~'}
+	{nl, '	Q203=' l_surface_Q203:'+5.3(p)'  '	;SURFACE COORDINATE ~'}
+	{nl, '	Q204=' l_clearance_plane_Q204:'+5.3(p)'   '	;2-JE BEZOP.RASSTOJ. ~'}
+	{nl, '	Q335='	(abs(Zadannyi_diametr)):'+5.3(p)' 	'	;NOMINALNYJ DIAMETR ~'}
+	{nl, '	Q342='	(abs(Diametr_chern_sverl)):'+5.3(p)'	'	;DIAM. CHER.SWERLENIA ~'}
+	{nl, '	Q351=+1    ;WID FREZEROWANIA'}
+	{nb, 'L' ' X' g_xpos ' Y' g_ypos ' R0 FMAX M99'}
+	
+endp
+;=============================
+@t_radius_aproach_skrugl
+	
+	local numeric x_center_approach h_offset ; координата центра траектории подвода
+	local numeric start_z_traekt_skr ; высота старта траектории скруглени¤ канавки по Z
+	local numeric l_diametr_aproach ; диаметр к которому будет совершатьс¤ подвод
+	local numeric l_corner_radius ; радиус скруглени¤ инструмента
+	local numeric l_feed
+	
+	if (g_dopTool_value<<2>> > 0) & Use_verhn_kanavka
+		l_corner_radius = g_dopTool_value<<2>>
+	else
+		l_corner_radius = corner_radius
+	endif
+	
+	
+	if Use_verhn_kanavka
+		l_diametr_aproach = Zadannyi_diametr - (2 * Radius_skrugleniya_kanavki) + (2 * l_corner_radius)
+		x_center_approach = g_xpos + ((abs(l_diametr_aproach)) + tool_diameter)/4 - tool_diameter/2
+		start_z_traekt_skr = g_surface_Q203 - g_cutting_tool_length
+		l_feed = 0.5 * feed
+	else
+		l_diametr_aproach = Zadannyi_diametr
+		x_center_approach = g_xpos + ((abs(l_diametr_aproach)) + tool_diameter)/4 - tool_diameter/2
+		start_z_traekt_skr = g_surface_Q203 - g_depth_Q201 + Radius_skrugleniya_kanavki - l_corner_radius
+		l_feed = feed
+	endif
+	
+	; подвод при фрезеровки радиуса скруглени¤
+	{nb, '; approach for radius slot'}
+	{nb, 'L X' g_xpos ' Y' g_ypos ' R0 FMAX'}
+	{nb, 'L Z' (start_z_traekt_skr + g_safety_Q200):'+5.3(p)' ' FMAX'}
+	{nb, 'L Z' start_z_traekt_skr:'+5.3(p)' ' F' l_feed:'+5.0(p)'}
+	{nb, 'L X' (g_xpos - (tool_diameter/2)):'+5.3(p)' ' Y' ypos ' RL'}
+	{nb, 'CC X' x_center_approach:'+5.3(p)' ' Y' g_ypos}
+	{nb, 'C X' ((abs(l_diametr_aproach))/2 + g_xpos):'+5.3(p)' ' Y' ypos ' DR+'}
+	{nb, 'CC X' g_xpos ' Y' g_ypos}
+	{nb, 'C X' ((abs(l_diametr_aproach))/2 + g_xpos):'+5.3(p)' ' Y' ypos ' DR+ RL'}
+	{nb, 'F' feed:'5.0(n)' ' ; rabochay podacha'}
+	
+endp
+;=============================
+@control_correctly_parameters_tRadius
+	
+	return_logical = true
+	if Radius_skrugleniya_kanavki <= corner_radius
+		return_logical = false
+		{nb, '* ERROR!!! >> radius skrugleniya instrumenta bolshe libo raven radiusu skrugleniya kanavki'}
+		return
+	endif
+	
+	if g_depth_Q201 < Radius_skrugleniya_kanavki
+		return_logical = false
+		{nb, '* ERROR!!! >> radius skrugleniya kanavki bolshe glubiny sverleniya v tsykle'}
+		return
+	endif
+	
+	if (Zadannyi_diametr - 2 * Radius_skrugleniya_kanavki) <= (2 * tool_offset - 2 * corner_radius)
+		return_logical = false
+		{nb, '* ERROR!!! >> instrument bolshe chem nizhniy diametr kanavki'}
+		return
+	endif
+	
+	if ((tool_type == ball_nose) or (tool_type == 1)) & Use_verhn_kanavka
+		return_logical = false
+		{nb, '* ERROR!!! >> dannyi tip instrumenta ne podderzhivaet frezerovku verhnego radiusa kanavki'}
+		return
+	endif
+	
+	if (tool_type == slot_mill) or (tool_type == ball_nose) or (tool_type == 1)
+		if (corner_radius <= 0) & (g_dopTool_value<<2>> <= 0)
+			return_logical = false
+			{nb, '* ERROR!!! >> radius skrugleniya instrumenta ne mozhet byt == 0'}
+			return
+		endif
+	else
+		return_logical = false
+		{nb, '* ERROR!!! >> dannyi cycle ne podderzhyvaet tekushiy tip instrumenta'}
+		return
+	endif
+
+endp
+;=============================
+@def_coolent_parameters
+	
+	return_string = ''
+	if flood_coolant or through_ival_coolant
+		if flood_coolant == 1
+			return_string = return_string + '1'
+		endif
+		if through_ival_coolant == 1
+			return_string = return_string + '2'
+			return_string = return_string + '3'
+			if (through_coolant_val > 72) & (through_coolant_val < 77)
+				g_through_coolant_val = through_coolant_val
+			else
+				g_through_coolant_val = 75
+			endif
+		endif
+	else
+		if air_through_coolant == 1
+			return_string = '4'
+		endif
+	endif
+	
+	if mach_flood_coolant == 1
+		return_string = return_string + '5'
+	endif
+	
+endp
+;=============================
+@coolent_status_output(string l_status, integer time_pause)
+	
+	local integer l_strlen_status ; длина строки
+		l_strlen_status = strlen(l_status)
+		local integer j ; счетчик считающий с начала строки
+		j = 1
+		local string l_while_status ; вычисляет номер события на каждой итерации цикла
+		while (l_strlen_status > 0) & (l_status ne '')
+			l_while_status = substr(l_status,j,1)
+			; - 1 - включение сож на инструмент снаружи
+			if l_while_status == '1'
+				{nb, 'M46 ; podacha sozh na instrument'}
+			endif
+			; - 2 - включение сож сквозь инструмент
+			if l_while_status == '2'
+				{nb, 'M49 ; podacha cherez shpindel'}
+			endif
+			; - 3 - включение давления сож сквозь инструмент
+			if l_while_status == '3'
+				{nb, 'M' g_through_coolant_val:'5.0(n)' ' ; davlenie sozh cherez shpindel'}
+			endif
+			; - 4 - включение обдува воздухом сквозь инструмент
+			if l_while_status == '4'
+				{nb, 'M61 ; podacha vozduha cherez shpindel'}
+			endif
+			; - 5 - включение сож в кабинете станка
+			if l_while_status == '5'
+				{nb, 'M47 ; vkl sozh v kabinete stanka'}
+			endif
+			; - 6 отключение сож
+			if l_while_status == '6'
+				{nb, 'M50 ; otkluchenie sozh'}
+			endif
+			; - 7 выключение обдувки воздухом
+			if l_while_status == '7'
+				{nb, 'M60 ; otkluchenie obduvki vozduhom'}
+			endif
+			; - 8 выдержка времени
+			if l_while_status == '8'
+				{nb, 'CYCL DEF 9.0 WYDERSHKA WREMENI'}
+				{nb, 'CYCL DEF 9.1 WYD.WR' time_pause:'5.0(n)'}
+			endif
+			; обновление условия while
+			j = j + 1
+			l_strlen_status = l_strlen_status - 1
+		endw
+	
+endp
+;=============================
+@stop_coolent(string l_coolent_status)
+
+	local string l_status_coolent
+	l_status_coolent = ''
+	; если включена обдувка воздухом
+	if instr(l_coolent_status, '4') > 0
+		l_status_coolent = l_status_coolent + '7'
+	else
+		if instr(l_coolent_status, '2') > 0
+			; если включена сож через инструмент
+			l_status_coolent = l_status_coolent + '6487'
+		else
+			if instr(l_coolent_status, '1') > 0
+				; если включена сож на инструмент
+				l_status_coolent = l_status_coolent + '6'
+			endif
+		endif
+	endif
+	; если включена только M47 или обдувка воздухом
+	if (l_status_coolent == '7' or l_status_coolent == '')
+		if instr(l_coolent_status, '5') > 0
+			l_status_coolent = l_status_coolent + '6'
+		endif
+	endif
+	call @coolent_status_output(l_status_coolent, g_waiting_time)
+	
+endp
+;=============================
+@define_dopTool_number
+
+	return_integer = 0 ; дополнительный инструмент по умолчанию отсутствует
+	local logical tool_type_dop_tool ; переменная указывающа, что инструмент может иметь доп инструмент
+		tool_type_dop_tool = false
+	if tool_type == taper_mill
+		tool_type_dop_tool = true
+	endif
+	if tool_type == spot_drill
+		tool_type_dop_tool = true
+	endif
+	if tool_type == chamfer_drill
+		tool_type_dop_tool = true
+	endif
+	if tool_type == dove_mill
+		tool_type_dop_tool = true
+	endif
+	if tool_type_dop_tool
+		if (job_type eq 'drill') or (job_type == 'drill_hr') or (job_type == 'mw_drill_5x')
+			if (g_drill_type == 10) or (g_drill_type == 11) or (drill_type == 10) or (drill_type == 11)
+				if (g_dopTool_value<<(Dop_tool_number + 1)>>) > 0
+					if  (Dop_tool_number >= 0) & (Dop_tool_number <= 2)
+						return_integer = Dop_tool_number
+					endif
+				endif
+			endif
+		endif
+	endif
+	
+endp
+;=============================
+@save_dopTool_number(integer number_dop_tool)
+	; сохраняет в глобальную переменную номер доп. инструмента
+	g_dop_tool_number = number_dop_tool
+	
+endp
+;=============================
+@set_dopTool_value
+	
+	if msg_mill_tool1 ne ''
+		g_dopTool_value<<1>> = abs(tonum(msg_mill_tool1))
+	else
+		g_dopTool_value<<1>> = 0
+	endif
+	if msg_mill_tool2 ne '' 
+		g_dopTool_value<<2>> = abs(tonum(msg_mill_tool2))
+	else
+		g_dopTool_value<<2>> = 0
+	endif
+	if msg_mill_tool3 ne '' 
+		g_dopTool_value<<3>> = abs(tonum(msg_mill_tool3))
+	else
+		g_dopTool_value<<3>> = 0
+	endif
+	
+endp
+;=============================
